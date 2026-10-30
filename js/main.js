@@ -2,6 +2,7 @@
 // and solver are in sudoku.js; the puzzles are made ahead of time (tools/make-sudoku.mjs) and read
 // from data/sudoku.json. Settings use the toolbox's shared panel (/shared/v1/settings.js).
 
+import { Book } from '/shared/v1/book.js'
 import { gameFrame, setupPage, tapToStart, warmOffline } from '/shared/v1/kit.js'
 import { gameStore } from '/shared/v1/save.js'
 import { SettingsPanel, toggle } from '/shared/v1/settings.js'
@@ -17,8 +18,6 @@ const HINT_WAIT = 120
 // Finger dragging: the number floats this far above the fingertip, and lands where the number
 // is, not where the finger is (user, 2026-10-30: "otherwise you are placing the number blind").
 const FINGER_LIFT = 72
-// Puzzles per page of a book (user, 2026-10-30).
-const PER_PAGE = 6
 
 const DIFFICULTY_NOTES = {
   easy: 'Plenty of numbers to start with. A gentle warm-up.',
@@ -27,13 +26,8 @@ const DIFFICULTY_NOTES = {
   expert: 'The toughest tricks. Still never needs a guess.',
 }
 
-// Lessons, each shown once, when a puzzle starts.
-const TIPS = [
-  {
-    id: 'paper',
-    text: 'Like a puzzle book. Tap to pencil in notes (a square then numbers, or a number then squares). Drag a number onto a square to ink it. Nothing is checked until the grid is full. Hint circles wrong ink; Look opens the answer key.',
-  },
-]
+// The rules open by themselves the first time a puzzle starts (then from the ? under the gear).
+const RULES_SEEN = 'rules'
 
 // Every difficulty is a book of puzzles (user, 2026-10-30): flip to any page, play any puzzle.
 // A finished puzzle is final: it stays in the book to look at, locked. Finishing a book moves you on
@@ -78,9 +72,11 @@ const sound = new Sound({ notes: 0.7, nature: 0.5, music: 0.35 })
 
 const $ = (id) => document.getElementById(id)
 setupPage()
-// Home goes up one step: from a puzzle to its book, from a book to the launch page.
+// Home goes up one step: from a puzzle to its book, from a book to the launch page. The ? under the
+// gear shows the rules while playing.
 const frame = gameFrame({
   onSettings: () => panel.open(),
+  onHelp: () => showRules(),
   beforeExit: () => saveBoard(),
   onHome: () => {
     saveBoard()
@@ -215,83 +211,56 @@ $('play').addEventListener('click', async () => {
 })
 
 // --- The book ----------------------------------------------------------------------------------
-// Six puzzles a page, each a small picture of its board with how it stands. Flip with the arrows;
-// pick one, then Start (greyed until one is picked).
+// The toolbox's book (/shared/v1/book.js): six puzzles a page, each a small picture of its board
+// with how it stands; flip with the arrows; pick one, then Start (greyed until one is picked).
 
-let bookPage = 1
-let chosen = null // the puzzle picked on the page
-
-const tiles = Array.from({ length: PER_PAGE }, () => {
-  const b = Object.assign(document.createElement('button'), { type: 'button', className: 'tile' })
-  b.innerHTML = '<span class="mini"></span><span class="tile-n"></span><span class="tile-state"></span><span class="tile-how"></span>'
-  b.querySelector('.mini').append(...Array.from({ length: 81 }, () => document.createElement('span')))
-  b.addEventListener('click', () => {
-    chosen = Number(b.dataset.n)
-    showBook()
-  })
-  return b
-})
-$('tiles').append(...tiles)
-
-function openBook(d, n = save.at[d] ?? nextOpen(d) ?? 1) {
-  save.difficulty = d
-  saveGame()
-  chosen = n
-  bookPage = Math.ceil(n / PER_PAGE)
-  showBook()
-}
-
-function showBook() {
-  hideScreens()
-  $('book-screen').hidden = false
-  frame.setPage('play') // Home goes back to the launch page
-  const d = save.difficulty
-  const pages = Math.ceil(bookSize(d) / PER_PAGE)
-  bookPage = Math.min(Math.max(1, bookPage), pages)
-  $('book-name').textContent = `${DIFFICULTY_NAMES[d]} book`
-  $('page-at').textContent = `Page ${bookPage} of ${pages}`
-  tiles.forEach((t, k) => {
-    const n = (bookPage - 1) * PER_PAGE + k + 1
-    t.hidden = n > bookSize(d)
-    if (t.hidden) return
-    t.dataset.n = n
+const book = new Book({
+  root: $('book'),
+  perPage: 6,
+  count: () => bookSize(save.difficulty),
+  buildTile: (tile) => {
+    tile.innerHTML = '<span class="mini"></span><span class="tile-n"></span><span class="tile-state"></span><span class="tile-how"></span>'
+    tile.querySelector('.mini').append(...Array.from({ length: 81 }, () => document.createElement('span')))
+  },
+  drawTile: (tile, n) => {
+    const d = save.difficulty
     const b = books[d][n]
     const given = puzzleFor(d, n)
     const ink = b ? parse(b.values) : []
     const white = new Set(b?.whiteout)
-    t.querySelectorAll('.mini span').forEach((sq, i) => {
+    tile.querySelectorAll('.mini span').forEach((sq, i) => {
       sq.textContent = given[i] || ink[i] || ''
       // White-out shows under new ink too, as on paper.
       sq.className = given[i] ? 'g' : [ink[i] && 'i', white.has(i) && 'w'].filter(Boolean).join(' ')
     })
-    t.querySelector('.tile-n').textContent = n
-    t.classList.toggle('solved', !!b?.done)
-    t.setAttribute('aria-pressed', String(n === chosen))
-    t.querySelector('.tile-state').textContent = b?.done ? clockText(b.time) : b ? `In progress · ${clockText(b.time)}` : 'Fresh'
-    const how = t.querySelector('.tile-how')
+    tile.querySelector('.tile-n').textContent = n
+    tile.classList.toggle('solved', !!b?.done)
+    tile.querySelector('.tile-state').textContent = b?.done ? clockText(b.time) : b ? `In progress · ${clockText(b.time)}` : 'Fresh'
+    const how = tile.querySelector('.tile-how')
     how.textContent = b?.done ? howSolved(b) : ''
     how.classList.toggle('own', !!b?.done && isOwn(b))
-  })
-  for (const id of ['first-page', 'prev-page']) $(id).disabled = bookPage === 1
-  for (const id of ['next-page', 'last-page']) $(id).disabled = bookPage === pages
-  const b = chosen && books[d][chosen]
-  const start = $('start')
-  start.disabled = !chosen
-  start.textContent = !chosen ? 'Pick a puzzle' : b?.done ? `Look at puzzle ${chosen}` : b ? `Continue puzzle ${chosen}` : `Start puzzle ${chosen}`
-  applyTheme()
-}
+  },
+  startLabel: (n) => {
+    const b = books[save.difficulty][n]
+    return b?.done ? `Look at puzzle ${n}` : b ? `Continue puzzle ${n}` : `Start puzzle ${n}`
+  },
+  onStart: (n) => start(save.difficulty, n),
+})
+book.start.id = 'start'
+book.label.id = 'page-at'
+for (const [key, id] of Object.entries({ first: 'first-page', prev: 'prev-page', next: 'next-page', last: 'last-page' })) book.arrows[key].id = id
 
-// Flipping to another page lets go of a puzzle picked on the old one (Start greys until you pick).
-const flip = (to) => () => {
-  bookPage = to()
-  if (chosen && Math.ceil(chosen / PER_PAGE) !== Math.min(bookPage, Math.ceil(bookSize(save.difficulty) / PER_PAGE))) chosen = null
-  showBook()
+function openBook(d, n = save.at[d] ?? nextOpen(d) ?? 1) {
+  save.difficulty = d
+  saveGame()
+  hideScreens()
+  $('book-screen').hidden = false
+  frame.setPage('play') // Home goes back to the launch page
+  frame.help.hidden = true // the rules are for the board
+  $('book-name').textContent = `${DIFFICULTY_NAMES[d]} book`
+  applyTheme()
+  book.open(n)
 }
-$('first-page').addEventListener('click', flip(() => 1))
-$('prev-page').addEventListener('click', flip(() => bookPage - 1))
-$('next-page').addEventListener('click', flip(() => bookPage + 1))
-$('last-page').addEventListener('click', flip(() => Infinity))
-$('start').addEventListener('click', () => chosen && start(save.difficulty, chosen))
 
 // --- The board ---------------------------------------------------------------------------------
 
@@ -332,8 +301,7 @@ const numberButtons = Array.from({ length: 9 }, (_, k) => {
   b.addEventListener('pointermove', (e) => {
     if (!drag || (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 10)) return
     drag.moved = true
-    hideCoach()
-    ghost.textContent = drag.d
+      ghost.textContent = drag.d
     ghost.hidden = false
     const at = dropPoint(e)
     ghost.style.left = `${at.x}px`
@@ -416,6 +384,7 @@ function start(difficulty, n) {
   saveGame()
   pick = null
   sel = null
+  for (const id of ['rules', 'answer-key', 'ask-look']) $(id).hidden = true
   $('play-screen').hidden = false
   $('play-screen').classList.toggle('readonly', !!current.done)
   frame.setPage('play')
@@ -425,10 +394,17 @@ function start(difficulty, n) {
   showClock()
   if (current.done) return
   startClock()
-  const tip = TIPS.find((t) => !save.tips.includes(t.id))
-  if (tip) coach(tip)
-  else $('coach').hidden = true
+  if (!save.tips.includes(RULES_SEEN)) {
+    save.tips.push(RULES_SEEN)
+    saveGame()
+    showRules()
+  }
 }
+
+function showRules() {
+  $('rules').hidden = false
+}
+$('rules').addEventListener('click', () => ($('rules').hidden = true))
 
 function saveBoard() {
   if (!current) return saveGame()
@@ -493,7 +469,6 @@ function render() {
 // Tapping only ever pencils, so a stray tap can't ink anything (user, 2026-10-30).
 function tapNumber(d) {
   if (!current || current.done) return
-  hideCoach()
   current.found = -1
   if (sel !== null && !current.values[sel]) return pencil(sel, d)
   pick = pick === d ? null : d
@@ -506,7 +481,6 @@ function tapNumber(d) {
 // tapping it again lets go. A held number and a picked square never go together.
 function tapCell(i) {
   if (!current) return
-  hideCoach()
   current.found = -1
   if (pick !== null) {
     if (!current.values[i]) return pencil(i, pick)
@@ -660,9 +634,14 @@ function stopClock() {
   ticking = 0
 }
 let lastSaved = 0
+// The clock counts only while the board is in full view (user, 2026-10-30): not while the rules,
+// Settings, the answer key, the "look?" question or the done card cover it, nor when the app is
+// hidden. The hint wait counts the same time.
+const boardInView = () =>
+  current && !current.done && !document.hidden && ['rules', 'answer-key', 'ask-look', 'done'].every((id) => $(id).hidden) && !document.querySelector('dialog[open]')
 function tick() {
   const now = performance.now()
-  if (current && !document.hidden) current.time += Math.min(now - lastTick, 1000) / 1000
+  if (boardInView()) current.time += Math.min(now - lastTick, 1000) / 1000
   lastTick = now
   showClock()
   showHintWait()
@@ -744,15 +723,6 @@ function toast(text, ms = 2800) {
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => el.classList.remove('show'), ms)
 }
-
-function coach(tip) {
-  save.tips.push(tip.id)
-  saveGame()
-  $('coach-text').textContent = tip.text
-  $('coach').hidden = false
-}
-const hideCoach = () => ($('coach').hidden = true)
-$('coach-ok').addEventListener('click', hideCoach)
 
 // A keyboard helps when playing on the computer: 1-9 pencils into the picked square (like a tap),
 // Shift + 1-9 inks it (like a drag), arrows move, Backspace erases notes, W whites out, Esc lets go.

@@ -7,6 +7,7 @@
     <meta name="theme-color" content="#ffffff" />
     <link rel="stylesheet" href="/shared/v1/kit.css" />
     <link rel="stylesheet" href="/shared/v1/settings.css" />
+    <link rel="stylesheet" href="/shared/v1/book.css" />
     <link rel="stylesheet" href="css/game.css" />
   </head>
   <body>
@@ -51,19 +52,8 @@
       <div class="top-bar">
         <p class="level-label" id="book-name">Easy book</p>
       </div>
-      <div class="book-area">
-        <div id="tiles" class="tiles"></div>
-        <nav class="pager" aria-label="Pages">
-          <button type="button" id="first-page" class="round" aria-label="First page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6v12M14 6l-6 6 6 6M20 6l-6 6 6 6"/></svg></button>
-          <button type="button" id="prev-page" class="round" aria-label="Previous page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
-          <p id="page-at" class="page-at">Page 1</p>
-          <button type="button" id="next-page" class="round" aria-label="Next page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
-          <button type="button" id="last-page" class="round" aria-label="Last page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6v12M10 6l6 6-6 6M4 6l6 6-6 6"/></svg></button>
-        </nav>
-      </div>
-      <div class="hub-launch-actions">
-        <button type="button" class="hub-play" id="start" disabled>Pick a puzzle</button>
-      </div>
+      <!-- Filled by the toolbox's book (/shared/v1/book.js): tiles, pager, Start. -->
+      <div id="book" class="book-area"></div>
     </section>
 
     <section id="play-screen" class="screen" hidden>
@@ -81,10 +71,6 @@
         </div>
         <div id="numbers" class="numbers" aria-label="Numbers"></div>
         <p id="toast" class="toast" role="status"></p>
-        <div id="coach" class="coach" hidden>
-          <p id="coach-text"></p>
-          <button type="button" id="coach-ok" class="pill">Got it</button>
-        </div>
         <nav class="bottom-bar">
           <button type="button" id="erase" class="tool"><span aria-hidden="true">⌫</span>Erase</button>
           <button type="button" id="whiteout" class="tool"><span aria-hidden="true" class="whiteout-icon"></span>White-out</button>
@@ -92,6 +78,28 @@
           <button type="button" id="look" class="tool"><span aria-hidden="true">▤</span>Look</button>
         </nav>
       </div>
+      <!-- The rules (the ? under the gear; opens by itself the first time). The clock stops while
+           it's open. Tap anywhere to close. -->
+      <div id="rules" class="rules" hidden>
+        <div class="rules-card">
+          <h2>How to play</h2>
+          <p class="rules-lead">Like a puzzle book: every row, column and 3×3 box holds 1 to 9 once.</p>
+          <dl>
+            <dt>Pencil: tap</dt>
+            <dd>Tap a square, then numbers, to note them small. Or tap a number (every copy lights up), then squares. Tap a note again to take it out. Notes are never checked.</dd>
+            <dt>Pen: drag</dt>
+            <dd>Drag a number onto a square to ink it. Ink is your answer and stays. Nothing is checked until the grid is full; then you hear whether it's solved, or how many squares are wrong.</dd>
+            <dt>Erase and White-out</dt>
+            <dd>Erase clears the pencil notes in a square. White-out covers ink with a white patch that stays, so you can ink again. Solved puzzles are final.</dd>
+            <dt>Hint and Look</dt>
+            <dd>The back of the book. Hint circles any wrong ink (then wait 2 minutes for the next). Look opens the answer key. Both are always there, and both are noted on the puzzle. Solve without them and it counts as <b>on your own</b>.</dd>
+            <dt>The clock</dt>
+            <dd>Counts only while the board is in front of you. It stops for these rules, Settings, the answer key, and when you leave.</dd>
+          </dl>
+          <p class="rules-close">Tap anywhere to close</p>
+        </div>
+      </div>
+
       <!-- Look: the answer key, after asking once. Tap anywhere to put it away. -->
       <div id="ask-look" class="done" hidden>
         <div class="done-card">

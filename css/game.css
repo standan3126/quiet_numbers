@@ -279,42 +279,10 @@ button {
 .book-area {
   position: absolute;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
+  justify-content: flex-start;
   padding: calc(env(safe-area-inset-top) + 70px) 16px calc(env(safe-area-inset-bottom) + 170px);
   box-sizing: border-box;
   overflow-y: auto;
-}
-
-.tiles {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  width: min(420px, 100%);
-}
-
-.tile {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-  padding: 6px 6px 8px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  text-align: left;
-  cursor: pointer;
-}
-
-.tile[hidden] {
-  display: none;
-}
-
-.tile[aria-pressed='true'] {
-  border: 2px solid var(--accent);
-  padding: 5px 5px 7px;
 }
 
 /* A small picture of the board: givens dark, ink in pen colour, white-out as white squares. */
@@ -357,7 +325,7 @@ button {
   background: var(--whiteout);
 }
 
-.tile-n {
+.hub-book-tile .tile-n {
   font-size: 1.05rem;
   font-weight: 700;
 }
@@ -367,7 +335,7 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-.tile.solved .tile-state {
+.hub-book-tile.solved .tile-state {
   font-weight: 600;
 }
 
@@ -380,44 +348,6 @@ button {
 .tile-how.own {
   color: var(--pen);
   font-weight: 600;
-}
-
-.pager {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.pager .round {
-  display: grid;
-  place-items: center;
-}
-
-.pager svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.pager .round:disabled {
-  opacity: 0.3;
-}
-
-.page-at {
-  min-width: 7.5em;
-  margin: 0;
-  text-align: center;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.hub-play:disabled {
-  opacity: 0.35;
-  box-shadow: none;
 }
 
 /* A finished puzzle opened to look at: no numbers or tools, just the board and how it went. */
@@ -480,7 +410,8 @@ html.ios-solid-bar .screen {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: calc(env(safe-area-inset-top) + 66px) 8px calc(env(safe-area-inset-bottom) + 10px);
+  /* Below the frame and the ? under the gear. */
+  padding: calc(env(safe-area-inset-top) + 114px) 8px calc(env(safe-area-inset-bottom) + 10px);
   box-sizing: border-box;
 }
 
@@ -749,8 +680,7 @@ html[data-input='stylus'] .ghost {
   opacity: 0.45;
 }
 
-.toast,
-.coach {
+.toast {
   position: absolute;
   z-index: 3;
   left: 50%;
@@ -764,9 +694,8 @@ html[data-input='stylus'] .ghost {
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
 }
 
-.toast.top,
-.coach.top {
-  top: calc(env(safe-area-inset-top) + 66px);
+.toast.top {
+  top: calc(env(safe-area-inset-top) + 112px); /* below the gear and the ? */
   bottom: auto;
 }
 
@@ -785,22 +714,66 @@ html[data-input='stylus'] .ghost {
   opacity: 1;
 }
 
-.coach {
-  width: min(360px, calc(100vw - 32px));
-  padding: 14px 16px;
+/* The rules, over the board. */
+.rules {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 64px) 14px calc(env(safe-area-inset-bottom) + 12px);
+  box-sizing: border-box;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  overflow-y: auto;
+  cursor: pointer;
 }
 
-.coach[hidden] {
+.rules[hidden] {
   display: none;
 }
 
-.coach p {
-  margin: 0;
-  flex: 1;
+.rules-card {
+  margin: auto 0; /* centred when it fits, from the top (scrolling) when it doesn't */
+  width: min(420px, 100%);
+  box-sizing: border-box;
+  padding: 20px 22px;
+  border-radius: var(--hub-radius);
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
+}
+
+.rules-card h2 {
+  margin: 0 0 6px;
+}
+
+.rules-lead {
+  margin: 0 0 12px;
+  color: var(--soft);
   line-height: 1.4;
+}
+
+.rules-card dl {
+  margin: 0;
+}
+
+.rules-card dt {
+  margin-top: 10px;
+  font-weight: 700;
+}
+
+.rules-card dd {
+  margin: 2px 0 0;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.rules-close {
+  margin: 14px 0 0;
+  color: var(--soft);
+  text-align: center;
+  font-size: 0.9rem;
 }
 
 .done {

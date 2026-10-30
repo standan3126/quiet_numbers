@@ -17,7 +17,7 @@ const play = async (page) => {
 const startPicked = async (page) => {
   await page.locator('#start').click()
   await expect(page.locator('#play-screen')).toBeVisible()
-  if (await page.locator('#coach').isVisible()) await page.locator('#coach-ok').click()
+  if (await page.locator('#rules').isVisible()) await page.locator('#rules').click() // first time: the rules
 }
 // Fills every open square but the last `left` with its answer, as if written in by hand earlier.
 const fillAllBut = (page, left) =>
@@ -104,7 +104,7 @@ test('the frame, and Easy 1 solved on your own by dragging the answers in', asyn
   // Home goes up one step: to the book (puzzle 1 solved, on your own), then to the launch page.
   await page.locator('.hub-corner', { hasText: 'Home' }).click()
   await expect(page.locator('#book-screen')).toBeVisible()
-  const first = page.locator('.tile').first()
+  const first = page.locator('.hub-book-tile').first()
   await expect(first.locator('.tile-how')).toHaveText('On your own')
   await expect(page.locator('#start')).toHaveText('Start puzzle 2') // opened, but nothing written yet
   await page.locator('.hub-corner', { hasText: 'Home' }).click()
@@ -222,7 +222,7 @@ test('the back of the book: a full grid says how many are wrong; Hint circles th
   await expect(page.locator('#done-lines')).toContainText('1 hint')
   await page.locator('#done-home').click()
   // The finished board stays in the book, white-out and all, and is final.
-  const tile = page.locator('.tile').first()
+  const tile = page.locator('.hub-book-tile').first()
   await expect(tile.locator('.tile-how')).toHaveText('1 hint')
   await expect(tile.locator('.mini .w')).toHaveCount(1)
   await tile.click()
@@ -262,8 +262,8 @@ test('Look asks once, shows the answer key, any tap puts it away; then it opens 
   await inkBy(page, a.i, a.d)
   await expect(page.locator('#done-lines')).toContainText('Looked')
   await page.locator('#done-home').click()
-  await expect(page.locator('.tile').first().locator('.tile-how')).toHaveText('Looked')
-  await expect(page.locator('.tile').first().locator('.tile-how')).not.toHaveClass(/own/)
+  await expect(page.locator('.hub-book-tile').first().locator('.tile-how')).toHaveText('Looked')
+  await expect(page.locator('.hub-book-tile').first().locator('.tile-how')).not.toHaveClass(/own/)
 })
 
 for (const how of ['Finger', 'Stylus'])
@@ -306,7 +306,7 @@ test('a half-done puzzle, its time and the difficulty are kept after closing the
   await number(page, b.d).click()
   await page.evaluate(() => (window.quietNumbers.current.time = 75))
   await page.locator('.hub-corner', { hasText: 'Home' }).click()
-  await expect(page.locator('.tile').first().locator('.tile-state')).toHaveText('In progress · 1:15')
+  await expect(page.locator('.hub-book-tile').first().locator('.tile-state')).toHaveText('In progress · 1:15')
   await page.locator('.hub-corner', { hasText: 'Home' }).click()
   await expect(page.locator('#board-status')).toContainText('Puzzle 1 is waiting')
   await page.reload()
@@ -351,21 +351,21 @@ test('the book: six puzzles a page, flip with the arrows, Start greys until one 
   await start(page)
   await page.locator('#play').click()
   await expect(page.locator('#book-name')).toHaveText('Easy book')
-  await expect(page.locator('.tile:not([hidden])')).toHaveCount(6)
-  await expect(page.locator('.tile').first()).toHaveAttribute('aria-pressed', 'true') // the puzzle you're on
+  await expect(page.locator('.hub-book-tile:not([hidden])')).toHaveCount(6)
+  await expect(page.locator('.hub-book-tile').first()).toHaveAttribute('aria-pressed', 'true') // the puzzle you're on
   await expect(page.locator('#start')).toHaveText('Start puzzle 1')
   await expect(page.locator('#first-page')).toBeDisabled()
   // Everything fits: six tiles above the pager, the pager above Start.
-  const tiles = await page.locator('#tiles').boundingBox()
-  const pager = await page.locator('.pager').boundingBox()
+  const tiles = await page.locator('.hub-book-tiles').boundingBox()
+  const pager = await page.locator('.hub-book-pager').boundingBox()
   const startBox = await page.locator('#start').boundingBox()
   expect(tiles.y + tiles.height).toBeLessThanOrEqual(pager.y)
   expect(pager.y + pager.height).toBeLessThanOrEqual(startBox.y)
   await page.locator('#next-page').click()
   await expect(page.locator('#page-at')).toHaveText(/^Page 2 of \d+$/)
-  await expect(page.locator('.tile').first().locator('.tile-n')).toHaveText('7')
+  await expect(page.locator('.hub-book-tile').first().locator('.tile-n')).toHaveText('7')
   await expect(page.locator('#start')).toBeDisabled()
-  await page.locator('.tile').nth(2).click()
+  await page.locator('.hub-book-tile').nth(2).click()
   await expect(page.locator('#start')).toHaveText('Start puzzle 9')
   await page.locator('#last-page').click()
   await expect(page.locator('#next-page')).toBeDisabled()
@@ -373,7 +373,7 @@ test('the book: six puzzles a page, flip with the arrows, Start greys until one 
   await expect(page.locator('#page-at')).toHaveText(/^Page 1 of/)
   // Any page can be played, like a book.
   await page.locator('#last-page').click()
-  await page.locator('.tile:not([hidden])').last().click()
+  await page.locator('.hub-book-tile:not([hidden])').last().click()
   await startPicked(page)
   const size = await page.evaluate(() => window.quietNumbers.current.n)
   await expect(page.locator('#level-name')).toHaveText(`Easy ${size}`)
@@ -397,4 +397,38 @@ test('finishing a book moves you on to the next one', async ({ page }) => {
   await page.locator('#next').click()
   await expect(page.locator('#book-name')).toHaveText('Medium book')
   await expect(page.locator('#start')).toHaveText('Start puzzle 1')
+})
+
+test('the clock counts only while the board is in view; the ? shows the rules', async ({ page }) => {
+  await start(page)
+  await page.locator('#play').click()
+  await page.locator('#start').click()
+  // The first time, the rules open by themselves, and the clock waits.
+  await expect(page.locator('#rules')).toBeVisible()
+  await page.waitForTimeout(1600)
+  expect((await state(page)).time).toBe(0)
+  await page.locator('#rules').click()
+  await expect(page.locator('#rules')).toBeHidden()
+  await page.waitForTimeout(1300)
+  const running = (await state(page)).time
+  expect(running).toBeGreaterThan(0.9)
+  // The ? under the gear (only while playing) opens them again; the clock stops.
+  const gear = await page.locator('.hub-gear').boundingBox()
+  const help = await page.locator('.hub-help').boundingBox()
+  expect(help.y).toBeGreaterThan(gear.y + gear.height)
+  await page.locator('.hub-help').click()
+  await expect(page.locator('#rules')).toContainText('Pen: drag')
+  await page.waitForTimeout(1300)
+  expect((await state(page)).time).toBeLessThan(running + 0.5)
+  await page.locator('#rules').click()
+  // Settings stop it too.
+  const before = (await state(page)).time
+  await page.locator('.hub-gear').click()
+  await page.waitForTimeout(1300)
+  expect((await state(page)).time).toBeLessThan(before + 0.5)
+  await page.locator('.hub-settings-close').click()
+  // No ? on the book.
+  await page.locator('.hub-corner', { hasText: 'Home' }).click()
+  await expect(page.locator('#book-screen')).toBeVisible()
+  await expect(page.locator('.hub-help')).toBeHidden()
 })
