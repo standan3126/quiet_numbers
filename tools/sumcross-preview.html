@@ -51,8 +51,11 @@
       }
       /* A number square: a box to write in (blank) or a printed number. */
       .sc-num {
-        border: 1.5px solid var(--grid-bold);
-        margin: -0.75px;
+        /* The line sits exactly on the box's edge (outline, half in, half out), so every box is the
+           same size and two neighbours share one 2 px line. A border with a negative margin was a
+           pixel or two off where rows met (user, 2026-10-30). */
+        outline: 2px solid var(--grid-bold);
+        outline-offset: -1px;
         background: #fffdf7;
         color: var(--given);
         font-weight: 700;
@@ -62,8 +65,11 @@
       }
       /* Signs and = get their own boxes too (user, 2026-10-30), printed lighter than numbers. */
       .sc-sign {
-        border: 1.5px solid var(--grid-bold);
-        margin: -0.75px;
+        /* The line sits exactly on the box's edge (outline, half in, half out), so every box is the
+           same size and two neighbours share one 2 px line. A border with a negative margin was a
+           pixel or two off where rows met (user, 2026-10-30). */
+        outline: 2px solid var(--grid-bold);
+        outline-offset: -1px;
         background: #ebe3cf;
         color: var(--soft);
         font-weight: 600;
@@ -72,8 +78,11 @@
          black squares of a printed crossword. */
       .sc-hole {
         background: var(--grid-bold);
-        border: 1.5px solid var(--grid-bold);
-        margin: -0.75px;
+        /* The line sits exactly on the box's edge (outline, half in, half out), so every box is the
+           same size and two neighbours share one 2 px line. A border with a negative margin was a
+           pixel or two off where rows met (user, 2026-10-30). */
+        outline: 2px solid var(--grid-bold);
+        outline-offset: -1px;
       }
       /* The ² sits in the top right corner of its number's box, readable even when the box is empty. */
       .sc-pow {

@@ -327,3 +327,40 @@ export function firstPuzzle(difficulty, name, Crossword) {
     if (puzzle) return { seed: `${name}:${k}`, puzzle }
   }
 }
+
+// --- Saving puzzles in the books -------------------------------------------------------------------
+// A puzzle is stored as its sums ("x,y,h|3 + 4 = 7", a squared number as "5²") and the indexes of
+// its blank squares; everything else is worked out again when it's loaded.
+
+const pieceText = (p) => (isPow(p) ? `${p.n}²` : String(p))
+const pieceOf = (t) => (/^\d+²$/.test(t) ? { n: Number(t.slice(0, -1)), pow: 2 } : /^\d+$/.test(t) ? Number(t) : t)
+
+export function encodePuzzle(p) {
+  const lines = p.sums.map((sum) => {
+    const a = p.squares[sum[0]]
+    const b = p.squares[sum[1]]
+    return `${a.x},${a.y},${b.x > a.x ? 'h' : 'v'}|${sum.map((i) => pieceText(p.squares[i].piece)).join(' ')}`
+  })
+  return { w: p.width, h: p.height, lines, blanks: p.squares.map((s, i) => (s.blank ? i : -1)).filter((i) => i !== -1) }
+}
+
+export function decodePuzzle({ w, h, lines, blanks }) {
+  const layout = {
+    width: w,
+    height: h,
+    lines: lines.map((line) => {
+      const [at, text] = line.split('|')
+      const [x, y, dir] = at.split(',')
+      return { x: Number(x), y: Number(y), dir, pieces: text.split(' ').map(pieceOf) }
+    }),
+  }
+  const { squares, sums } = squaresOf(layout)
+  const blank = new Set(blanks)
+  return {
+    width: w,
+    height: h,
+    squares: squares.map((s, i) => ({ ...s, blank: blank.has(i) })),
+    bank: blanks.map((i) => answerOf(squares[i].piece)).sort((a, b) => a - b),
+    sums,
+  }
+}
