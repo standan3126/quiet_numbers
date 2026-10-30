@@ -6,7 +6,7 @@ import { gameFrame, setupPage, tapToStart, warmOffline } from '/shared/v1/kit.js
 import { gameStore } from '/shared/v1/save.js'
 import { SettingsPanel, toggle } from '/shared/v1/settings.js'
 import { Sound } from '/shared/v1/sound/index.js'
-import { DIFFICULTIES, DIFFICULTY_NAMES, PEERS, digitsOf, parse, rng, shuffle, solve } from './sudoku.js'
+import { DIFFICULTIES, DIFFICULTY_NAMES, PEERS, digitsOf, parse, solve } from './sudoku.js'
 
 const GAME_ID = 'quiet-numbers'
 const store = gameStore(GAME_ID)
@@ -17,6 +17,8 @@ const HINT_WAIT = 120
 // Finger dragging: the number floats this far above the fingertip, and lands where the number
 // is, not where the finger is (user, 2026-10-30: "otherwise you are placing the number blind").
 const FINGER_LIFT = 72
+// Puzzles per page of a book (user, 2026-10-30).
+const PER_PAGE = 6
 
 const DIFFICULTY_NOTES = {
   easy: 'Plenty of numbers to start with. A gentle warm-up.',
@@ -33,40 +35,57 @@ const TIPS = [
   },
 ]
 
-// Save format v1: the game and difficulty picked on the home page, per difficulty the next puzzle
-// number, how many solved, how many on your own (no hints, no look), the best time on your own and
-// the history of finished puzzles ({ n, time, hints, looked, day }), a half-played board per
-// difficulty, lessons seen.
-const NEW_SAVE = () => ({
-  v: 1,
-  game: 'sudoku',
-  difficulty: 'easy',
-  sudoku: Object.fromEntries(DIFFICULTIES.map((d) => [d, { next: 1, solved: 0, own: 0, best: null, history: [] }])),
-  boards: {},
-  tips: [],
-})
+// Every difficulty is a book of puzzles (user, 2026-10-30): flip to any page, play any puzzle.
+// A finished puzzle is final: it stays in the book to look at, locked. Finishing a book moves you on
+// to the next difficulty. Saves (format v2; v1 test saves start fresh, the user agreed):
+//   save:        { v, game, difficulty (the book picked), at: { easy: puzzle last opened }, tips }
+//   book-<diff>: { [puzzle number]: board }, board = { values (81: '.' or ink), notes (while open),
+//                whiteout, checked (square lists), hints, looked, time, hintAt, done (local day) }
+const NEW_SAVE = () => ({ v: 2, game: 'sudoku', difficulty: 'easy', at: {}, tips: [] })
 
 let save
+const books = {}
 function load() {
   const saved = store.get('save', {})
-  const fresh = NEW_SAVE()
-  save = { ...fresh, ...saved, sudoku: Object.fromEntries(DIFFICULTIES.map((d) => [d, { ...fresh.sudoku[d], ...saved.sudoku?.[d] }])), boards: { ...saved.boards } }
-  for (const d of DIFFICULTIES) save.sudoku[d].history ??= []
+  save = saved.v === 2 ? { ...NEW_SAVE(), ...saved, at: { ...saved.at } } : NEW_SAVE()
+  for (const d of DIFFICULTIES) books[d] = store.get(`book-${d}`, {})
 }
 load()
 const saveGame = () => store.set('save', save)
+const saveBook = (d) => store.set(`book-${d}`, books[d])
 saveGame()
+
+const today = () => new Date().toLocaleDateString('en-CA') // the local day, YYYY-MM-DD
+const isOwn = (b) => !b.hints && !b.looked
+// A book's tally: how many solved, how many on your own, the best time on your own.
+function tally(d) {
+  const done = Object.values(books[d]).filter((b) => b.done)
+  const own = done.filter(isOwn)
+  return { solved: done.length, own: own.length, best: own.length ? Math.min(...own.map((b) => b.time)) : null }
+}
+const bookSize = (d) => packs[d].length
+// The first unsolved puzzle after n (then from the start); null when the book is finished.
+function nextOpen(d, n = 0) {
+  const size = bookSize(d)
+  for (let k = 1; k <= size; k++) {
+    const m = ((n + k - 1) % size) + 1
+    if (!books[d][m]?.done) return m
+  }
+  return null
+}
 
 const sound = new Sound({ notes: 0.7, nature: 0.5, music: 0.35 })
 
 const $ = (id) => document.getElementById(id)
 setupPage()
+// Home goes up one step: from a puzzle to its book, from a book to the launch page.
 const frame = gameFrame({
   onSettings: () => panel.open(),
   beforeExit: () => saveBoard(),
   onHome: () => {
     saveBoard()
-    showHome()
+    if (current) openBook(current.difficulty, current.n)
+    else showHome()
   },
 })
 
@@ -92,19 +111,8 @@ const panel = new SettingsPanel({
         ),
     },
   ],
-  manual: {
-    fields: DIFFICULTIES.map((d) => ({ id: d, label: `${DIFFICULTY_NAMES[d]} puzzle`, min: 1, get: () => save.sudoku[d].next })),
-    onSet: (values) => {
-      for (const d of DIFFICULTIES) {
-        if (values[d] !== save.sudoku[d].next && save.boards[d]?.n !== values[d]) delete save.boards[d]
-        save.sudoku[d].next = values[d]
-      }
-      if (current) current = null
-      saveGame()
-      showHome()
-      return `Set: ${DIFFICULTIES.map((d) => `${DIFFICULTY_NAMES[d]} ${values[d]}`).join(', ')}.`
-    },
-  },
+  // No hidden set-progress tools: every page of every book is open to play, so there's nothing to
+  // unlock by hand.
   credits: [
     'Quiet Numbers was made for GameHub. Every puzzle is made and checked by our own code.',
     'Every sound and all the music are made in code by the GameHub toolbox. Nothing is borrowed.',
@@ -125,7 +133,7 @@ const panel = new SettingsPanel({
 function applyTheme() {
   const theme = panel.night ? 'night' : 'day'
   document.documentElement.dataset.theme = theme
-  document.querySelector('meta[name="theme-color"]').content = theme === 'night' ? '#1a0e06' : '#ffffff'
+  document.querySelector('meta[name="theme-color"]').content = theme === 'night' ? '#1a0e06' : '#f6f0e1'
 }
 
 // --- Puzzles -----------------------------------------------------------------------------------
@@ -135,27 +143,20 @@ const packsReady = fetch('data/sudoku.json')
   .then((r) => r.json())
   .then((data) => (packs = data))
 
-// Puzzle n of a difficulty. Past the end of the list, an earlier puzzle comes back with its
-// numbers swapped around (same puzzle underneath, looks new), so there's always another one.
-function puzzleFor(difficulty, n) {
-  const list = packs[difficulty]
-  const grid = parse(list[(n - 1) % list.length])
-  if (n <= list.length) return grid
-  const swap = [0, ...shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9], rng(`${difficulty}:${n}:swap`))]
-  return grid.map((v) => swap[v])
-}
+// Puzzle n of a difficulty (1 to the book's size).
+const puzzleFor = (difficulty, n) => parse(packs[difficulty][n - 1])
 
 // --- Home --------------------------------------------------------------------------------------
 
-// The launch page: a card per game that opens to show what it is, how hard, and the history. Each
-// kind of information has its own look (user, 2026-10-30: "finding the information was difficult
-// because its all the same font, same size, same color"): the about text is plain and soft, the
-// puzzle you're on is bold, a waiting board is a coloured line, and the history is its own button.
+// The launch page: a card per game that opens to show what it is and how hard. Each kind of
+// information has its own look (user, 2026-10-30: "finding the information was difficult because
+// its all the same font, same size, same color"): the about text is plain and soft, how far you are
+// is bold, a waiting board is a coloured line. Play opens the book.
 const difficultyRows = DIFFICULTIES.map((d) => {
   const b = Object.assign(document.createElement('button'), { type: 'button', className: 'level-row' })
   b.dataset.value = d
   b.setAttribute('role', 'radio')
-  b.innerHTML = '<span class="level-name"></span><span class="level-at">Puzzle <b></b></span>'
+  b.innerHTML = '<span class="level-name"></span><span class="level-at"><b></b> of <span class="level-size"></span> solved</span>'
   b.querySelector('.level-name').textContent = DIFFICULTY_NAMES[d]
   b.addEventListener('click', () => {
     save.difficulty = d
@@ -172,53 +173,34 @@ $('open-sudoku').addEventListener('click', () => {
   showHome()
 })
 
-function showHome() {
+function hideScreens() {
   stopClock()
   current = null
-  $('done').hidden = true
-  $('play-screen').hidden = true
+  for (const id of ['home', 'book-screen', 'play-screen', 'done']) $(id).hidden = true
+}
+
+function showHome() {
+  hideScreens()
   $('home').hidden = false
   frame.setPage('launch')
   $('open-sudoku').setAttribute('aria-expanded', String(cardOpen))
   $('sudoku-body').hidden = !cardOpen
   const d = save.difficulty
-  for (const row of difficultyRows) {
-    const at = save.sudoku[row.dataset.value]
-    row.setAttribute('aria-checked', String(row.dataset.value === d))
-    row.querySelector('b').textContent = at.next
-  }
-  const { next, solved, own } = save.sudoku[d]
   $('difficulty-note').textContent = DIFFICULTY_NOTES[d]
-  const waiting = save.boards[d]?.n === next
-  $('board-status').textContent = waiting ? `Puzzle ${next} is waiting where you left it.` : `Puzzle ${next} is a fresh page.`
-  $('board-status').classList.toggle('waiting', waiting)
-  $('history').textContent = solved ? `${DIFFICULTY_NAMES[d]} history: ${solved} solved, ${own} on your own` : `${DIFFICULTY_NAMES[d]} history: none solved yet`
   applyTheme()
+  if (!packs) return
+  for (const row of difficultyRows) {
+    const r = row.dataset.value
+    row.setAttribute('aria-checked', String(r === d))
+    row.querySelector('b').textContent = tally(r).solved
+    row.querySelector('.level-size').textContent = bookSize(r)
+  }
+  const at = save.at[d]
+  const waiting = at && books[d][at] && !books[d][at].done
+  const next = nextOpen(d)
+  $('board-status').textContent = waiting ? `Puzzle ${at} is waiting where you left it.` : next ? `Next: puzzle ${next}.` : `You finished the ${DIFFICULTY_NAMES[d]} book.`
+  $('board-status').classList.toggle('waiting', !!waiting)
 }
-
-// History: every finished puzzle of the picked difficulty, newest first, with its time and how it
-// was solved. Not the boards themselves.
-$('history').addEventListener('click', () => {
-  const d = save.difficulty
-  const { solved, own, best, history } = save.sudoku[d]
-  $('history-title').textContent = `${DIFFICULTY_NAMES[d]} history`
-  $('history-summary').textContent = solved ? `${solved} solved · ${own} on your own${best !== null ? ` · best on your own ${clockText(best)}` : ''}` : 'Nothing solved yet. Your finished puzzles will show here.'
-  $('history-list').replaceChildren(
-    ...[...history].reverse().map((h) => {
-      const li = document.createElement('li')
-      li.className = 'history-row'
-      li.innerHTML = '<span class="h-n"></span><span class="h-time"></span><span class="h-how"></span><span class="h-day"></span>'
-      li.querySelector('.h-n').textContent = `Puzzle ${h.n}`
-      li.querySelector('.h-time').textContent = clockText(h.time)
-      li.querySelector('.h-how').textContent = howSolved(h)
-      li.querySelector('.h-how').classList.toggle('own', !h.hints && !h.looked)
-      li.querySelector('.h-day').textContent = new Date(`${h.day}T12:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-      return li
-    }),
-  )
-  $('history-dialog').showModal()
-})
-$('history-close').addEventListener('click', () => $('history-dialog').close())
 
 // "On your own", "2 hints", "Looked", "1 hint, looked".
 function howSolved({ hints, looked }) {
@@ -229,8 +211,87 @@ function howSolved({ hints, looked }) {
 
 $('play').addEventListener('click', async () => {
   await packsReady
-  start(save.difficulty, save.sudoku[save.difficulty].next)
+  openBook(save.difficulty)
 })
+
+// --- The book ----------------------------------------------------------------------------------
+// Six puzzles a page, each a small picture of its board with how it stands. Flip with the arrows;
+// pick one, then Start (greyed until one is picked).
+
+let bookPage = 1
+let chosen = null // the puzzle picked on the page
+
+const tiles = Array.from({ length: PER_PAGE }, () => {
+  const b = Object.assign(document.createElement('button'), { type: 'button', className: 'tile' })
+  b.innerHTML = '<span class="mini"></span><span class="tile-n"></span><span class="tile-state"></span><span class="tile-how"></span>'
+  b.querySelector('.mini').append(...Array.from({ length: 81 }, () => document.createElement('span')))
+  b.addEventListener('click', () => {
+    chosen = Number(b.dataset.n)
+    showBook()
+  })
+  return b
+})
+$('tiles').append(...tiles)
+
+function openBook(d, n = save.at[d] ?? nextOpen(d) ?? 1) {
+  save.difficulty = d
+  saveGame()
+  chosen = n
+  bookPage = Math.ceil(n / PER_PAGE)
+  showBook()
+}
+
+function showBook() {
+  hideScreens()
+  $('book-screen').hidden = false
+  frame.setPage('play') // Home goes back to the launch page
+  const d = save.difficulty
+  const pages = Math.ceil(bookSize(d) / PER_PAGE)
+  bookPage = Math.min(Math.max(1, bookPage), pages)
+  $('book-name').textContent = `${DIFFICULTY_NAMES[d]} book`
+  $('page-at').textContent = `Page ${bookPage} of ${pages}`
+  tiles.forEach((t, k) => {
+    const n = (bookPage - 1) * PER_PAGE + k + 1
+    t.hidden = n > bookSize(d)
+    if (t.hidden) return
+    t.dataset.n = n
+    const b = books[d][n]
+    const given = puzzleFor(d, n)
+    const ink = b ? parse(b.values) : []
+    const white = new Set(b?.whiteout)
+    t.querySelectorAll('.mini span').forEach((sq, i) => {
+      sq.textContent = given[i] || ink[i] || ''
+      // White-out shows under new ink too, as on paper.
+      sq.className = given[i] ? 'g' : [ink[i] && 'i', white.has(i) && 'w'].filter(Boolean).join(' ')
+    })
+    t.querySelector('.tile-n').textContent = n
+    t.classList.toggle('solved', !!b?.done)
+    t.setAttribute('aria-pressed', String(n === chosen))
+    t.querySelector('.tile-state').textContent = b?.done ? clockText(b.time) : b ? `In progress · ${clockText(b.time)}` : 'Fresh'
+    const how = t.querySelector('.tile-how')
+    how.textContent = b?.done ? howSolved(b) : ''
+    how.classList.toggle('own', !!b?.done && isOwn(b))
+  })
+  for (const id of ['first-page', 'prev-page']) $(id).disabled = bookPage === 1
+  for (const id of ['next-page', 'last-page']) $(id).disabled = bookPage === pages
+  const b = chosen && books[d][chosen]
+  const start = $('start')
+  start.disabled = !chosen
+  start.textContent = !chosen ? 'Pick a puzzle' : b?.done ? `Look at puzzle ${chosen}` : b ? `Continue puzzle ${chosen}` : `Start puzzle ${chosen}`
+  applyTheme()
+}
+
+// Flipping to another page lets go of a puzzle picked on the old one (Start greys until you pick).
+const flip = (to) => () => {
+  bookPage = to()
+  if (chosen && Math.ceil(chosen / PER_PAGE) !== Math.min(bookPage, Math.ceil(bookSize(save.difficulty) / PER_PAGE))) chosen = null
+  showBook()
+}
+$('first-page').addEventListener('click', flip(() => 1))
+$('prev-page').addEventListener('click', flip(() => bookPage - 1))
+$('next-page').addEventListener('click', flip(() => bookPage + 1))
+$('last-page').addEventListener('click', flip(() => Infinity))
+$('start').addEventListener('click', () => chosen && start(save.difficulty, chosen))
 
 // --- The board ---------------------------------------------------------------------------------
 
@@ -242,7 +303,8 @@ $('play').addEventListener('click', async () => {
 // of the book: always there, and recorded, so "on your own" means something (willpower, not a rule).
 // values = givens and ink (right or wrong); whiteout / checked = squares (Sets); hints = how often
 // Hint was used; looked = the answer key was opened before the puzzle was finished.
-let current = null // { difficulty, n, given, solution, values, notes, whiteout, checked, hints, looked, time, hintAt, found }
+// done = the day it was solved: the board is then final, to look at only.
+let current = null // { difficulty, n, given, solution, values, notes, whiteout, checked, hints, looked, time, hintAt, done, found }
 let pick = null // the number picked on the number row
 let sel = null // the square tapped last
 let input = 'finger' // 'finger' | 'stylus', asked on the start card every time the game opens
@@ -263,7 +325,7 @@ const numberButtons = Array.from({ length: 9 }, (_, k) => {
     if (performance.now() - dragged > 400) tapNumber(d)
   })
   b.addEventListener('pointerdown', (e) => {
-    if (!current) return
+    if (!current || current.done) return
     drag = { d, x: e.clientX, y: e.clientY, moved: false, over: -1 }
     b.setPointerCapture(e.pointerId)
   })
@@ -332,34 +394,36 @@ new ResizeObserver(([entry]) => {
 function start(difficulty, n) {
   const given = puzzleFor(difficulty, n)
   const solution = solve(given)
-  const kept = save.boards[difficulty]
-  const resume = kept?.n === n ? kept : null
+  const kept = books[difficulty][n]
+  hideScreens()
   current = {
     difficulty,
     n,
     given,
     solution,
-    values: resume ? parse(resume.values).map((v, i) => given[i] || v) : given.slice(),
-    notes: resume?.notes?.slice() ?? new Array(81).fill(0),
-    whiteout: new Set(resume?.whiteout ?? []),
-    checked: new Set(resume?.checked ?? []),
-    hints: resume?.hints ?? 0,
-    looked: resume?.looked ?? false,
-    time: resume?.time ?? 0,
-    hintAt: resume?.hintAt ?? 0,
+    values: kept ? parse(kept.values).map((v, i) => given[i] || v) : given.slice(),
+    notes: kept?.notes?.slice() ?? new Array(81).fill(0),
+    whiteout: new Set(kept?.whiteout ?? []),
+    checked: new Set(kept?.checked ?? []),
+    hints: kept?.hints ?? 0,
+    looked: kept?.looked ?? false,
+    time: kept?.time ?? 0,
+    hintAt: kept?.hintAt ?? 0,
+    done: kept?.done ?? null,
     found: -1,
   }
+  save.at[difficulty] = n
+  saveGame()
   pick = null
   sel = null
-  $('home').hidden = true
-  $('done').hidden = true
   $('play-screen').hidden = false
+  $('play-screen').classList.toggle('readonly', !!current.done)
   frame.setPage('play')
   $('level-name').textContent = `${DIFFICULTY_NAMES[difficulty]} ${n}`
   applyTheme()
   render()
   showClock()
-  if (isSolved()) return finish()
+  if (current.done) return
   startClock()
   const tip = TIPS.find((t) => !save.tips.includes(t.id))
   if (tip) coach(tip)
@@ -368,10 +432,13 @@ function start(difficulty, n) {
 
 function saveBoard() {
   if (!current) return saveGame()
-  const { difficulty, n, given, values, notes, whiteout, checked, hints, looked, time, hintAt } = current
-  if (isSolved()) delete save.boards[difficulty]
-  else save.boards[difficulty] = { n, values: values.map((v, i) => (given[i] ? '.' : v || '.')).join(''), notes, whiteout: [...whiteout], checked: [...checked], hints, looked, time: Math.round(time * 10) / 10, hintAt }
-  saveGame()
+  const { difficulty, n, given, values, notes, whiteout, checked, hints, looked, time, hintAt, done } = current
+  if (done) return // final
+  // An untouched page stays out of the book's save until something is written on it.
+  const touched = values.some((v, i) => v && !given[i]) || notes.some(Boolean) || whiteout.size || hints || looked
+  if (!touched && !books[difficulty][n]) return
+  books[difficulty][n] = { values: values.map((v, i) => (given[i] ? '.' : v || '.')).join(''), notes, whiteout: [...whiteout], checked: [...checked], hints, looked, time: Math.round(time * 10) / 10, hintAt }
+  saveBook(difficulty)
 }
 
 const isSolved = () => current.values.every((v, i) => v === current.solution[i])
@@ -425,7 +492,7 @@ function render() {
 // picked for more notes). Otherwise picks the number (every copy lights up) or lets it go.
 // Tapping only ever pencils, so a stray tap can't ink anything (user, 2026-10-30).
 function tapNumber(d) {
-  if (!current) return
+  if (!current || current.done) return
   hideCoach()
   current.found = -1
   if (sel !== null && !current.values[sel]) return pencil(sel, d)
@@ -460,6 +527,7 @@ function pencil(i, d) {
 // row, column and box, right or wrong alike (anything else would tell you if it was right). The
 // same sound every time, for the same reason.
 function ink(i, d) {
+  if (current.done) return
   const { values, notes, given } = current
   if (given[i]) return toast('That number is printed.')
   if (values[i]) return toast('That square is inked. White-out covers it.')
@@ -483,14 +551,18 @@ function afterInk() {
 
 // Under the grid: how much of the back of the book was used, so "on your own" is plain to see.
 function showRecord() {
-  const { hints, looked } = current
+  const { hints, looked, done, time } = current
+  if (done) {
+    $('record').textContent = `Solved ${new Date(`${done}T12:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${clockText(time)} · ${howSolved(current)}`
+    return
+  }
   $('record').textContent = hints || looked ? [hints && `${hints} hint${hints > 1 ? 's' : ''}`, looked && 'looked at the answer key'].filter(Boolean).join(' · ') : 'On your own so far'
 }
 
 // White-out: covers the ink in the picked square with an off-white patch that stays, so the square
 // can be inked again. The only way to change ink, and to start a board over (square by square).
 $('whiteout').addEventListener('click', () => {
-  if (!current) return
+  if (!current || current.done) return
   if (sel === null) return toast('Tap an inked square, then White-out.')
   if (current.given[sel]) return toast('That number is printed.')
   if (!current.values[sel]) return toast(current.notes[sel] ? 'White-out is for ink. Erase clears pencil.' : 'Nothing to cover there.')
@@ -504,7 +576,7 @@ $('whiteout').addEventListener('click', () => {
 
 // The eraser: clears the pencil notes in the picked square.
 $('erase').addEventListener('click', () => {
-  if (!current) return
+  if (!current || current.done) return
   if (sel === null || current.given[sel]) return toast('Tap a square with notes, then Erase.')
   if (current.values[sel]) return toast('Erase is for pencil. White-out covers ink.')
   current.notes[sel] = 0
@@ -610,34 +682,44 @@ document.addEventListener('visibilitychange', () => {
 
 // --- Done --------------------------------------------------------------------------------------
 
+// Solved: the board becomes final (kept in the book to look at), then on to the next open puzzle,
+// or, when the book is finished, to the next book (user, 2026-10-30).
+let afterDone = null
 function finish() {
   if ($('done').hidden === false) return
   stopClock()
-  const { difficulty, n, time, hints, looked } = current
-  const stats = save.sudoku[difficulty]
-  const own = onYourOwn()
-  const name = DIFFICULTY_NAMES[difficulty]
+  const { difficulty: d, n, time } = current
+  const before = tally(d)
+  current.done = today()
+  books[d][n] = { values: current.values.map((v, i) => (current.given[i] ? '.' : v)).join(''), whiteout: [...current.whiteout], checked: [...current.checked], hints: current.hints, looked: current.looked, time: Math.round(time), done: current.done }
+  saveBook(d)
+  const own = isOwn(current)
+  const name = DIFFICULTY_NAMES[d]
   const lines = [`${name} puzzle ${n}`]
-  if (!own) lines.push(howSolved({ hints, looked }))
-  if (n === stats.next) {
-    stats.next = n + 1
-    stats.solved++
-    if (own) stats.own++
-    stats.history.push({ n, time: Math.round(time), hints, looked, day: new Date().toLocaleDateString('en-CA') }) // the local day, YYYY-MM-DD
-  }
+  if (!own) lines.push(howSolved(current))
   // Best times count only puzzles solved on your own.
   if (panel.settings.showClock) {
     lines.push(`Time ${clockText(time)}`)
-    if (own) lines.push(stats.best === null ? `Your first ${name} time on your own` : time < stats.best ? `A new best for ${name}!` : `Your best ${name}: ${clockText(stats.best)}`)
+    if (own) lines.push(before.best === null ? `Your first ${name} time on your own` : time < before.best ? `A new best for ${name}!` : `Your best ${name}: ${clockText(before.best)}`)
   }
-  if (own && (stats.best === null || time < stats.best)) stats.best = Math.round(time)
-  delete save.boards[difficulty]
-  saveGame()
   pick = null
   sel = null
+  $('play-screen').classList.add('readonly')
   render()
   sound.celebrate()
-  showCard(own ? 'Solved on your own!' : 'Solved!', lines, 'Next puzzle')
+  const next = nextOpen(d, n)
+  if (next) {
+    afterDone = () => start(d, next)
+    return showCard(own ? 'Solved on your own!' : 'Solved!', lines, `Next: puzzle ${next}`)
+  }
+  const after = DIFFICULTIES[DIFFICULTIES.indexOf(d) + 1]
+  lines.push(after ? `You finished the ${name} book!` : 'You finished every book. New puzzles come with updates.')
+  afterDone = after ? () => openBook(after) : () => showHome()
+  if (after) {
+    save.difficulty = after
+    saveGame()
+  }
+  showCard(own ? 'Solved on your own!' : 'Solved!', lines, after ? `Open the ${DIFFICULTY_NAMES[after]} book` : 'Home')
 }
 
 function showCard(title, lines, action) {
@@ -647,8 +729,8 @@ function showCard(title, lines, action) {
   $('done').hidden = false
 }
 
-$('next').addEventListener('click', () => start(current.difficulty, current.n + 1))
-$('done-home').addEventListener('click', showHome)
+$('next').addEventListener('click', () => afterDone?.())
+$('done-home').addEventListener('click', () => openBook(current.difficulty, current.n))
 
 // --- Little things -----------------------------------------------------------------------------
 
@@ -675,7 +757,7 @@ $('coach-ok').addEventListener('click', hideCoach)
 // A keyboard helps when playing on the computer: 1-9 pencils into the picked square (like a tap),
 // Shift + 1-9 inks it (like a drag), arrows move, Backspace erases notes, W whites out, Esc lets go.
 document.addEventListener('keydown', (e) => {
-  if (!current || $('done').hidden === false || document.querySelector('dialog[open]')) return
+  if (!current || current.done || $('done').hidden === false || document.querySelector('dialog[open]')) return
   const digit = /^Digit[1-9]$/.test(e.code) ? Number(e.code.slice(5)) : 0
   if (digit && e.shiftKey) {
     if (sel !== null) ink(sel, digit)
@@ -700,6 +782,7 @@ document.addEventListener('keydown', (e) => {
 // --- Start -------------------------------------------------------------------------------------
 
 showHome()
+packsReady.then(() => $('home').hidden || showHome())
 // For the tests (and curious grown-ups in the browser console).
 window.quietNumbers = {
   panel,
@@ -707,7 +790,9 @@ window.quietNumbers = {
     return input
   },
   start,
+  openBook,
   packsReady,
+  books,
   get current() {
     return current
   },

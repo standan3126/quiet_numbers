@@ -1,8 +1,5 @@
 // Plays Quiet Numbers in phone-sized browsers: npm test (starts its own server on 4230).
-import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-
-const FAMILY_CODE = process.env.HUB_CODE ?? readFileSync(new URL('../../hub/private/family-code.txt', import.meta.url), 'utf8').trim()
 
 // The start card asks Finger or Stylus every time.
 const start = async (page, how = 'Finger') => {
@@ -11,11 +8,24 @@ const start = async (page, how = 'Finger') => {
   await expect(page.locator('#home')).toBeVisible()
 }
 
+// Play opens the book with the puzzle you're on picked; Start opens it.
 const play = async (page) => {
   await page.locator('#play').click()
+  await expect(page.locator('#book-screen')).toBeVisible()
+  await startPicked(page)
+}
+const startPicked = async (page) => {
+  await page.locator('#start').click()
   await expect(page.locator('#play-screen')).toBeVisible()
   if (await page.locator('#coach').isVisible()) await page.locator('#coach-ok').click()
 }
+// Fills every open square but the last `left` with its answer, as if written in by hand earlier.
+const fillAllBut = (page, left) =>
+  page.evaluate((left) => {
+    const c = window.quietNumbers.current
+    const open = c.values.map((v, i) => (v ? -1 : i)).filter((i) => i !== -1)
+    for (const i of open.slice(0, -left)) c.values[i] = c.solution[i]
+  }, left)
 
 const cell = (page, i) => page.locator('.cell').nth(i)
 const number = (page, d) => page.locator('.number').nth(d - 1)
@@ -62,7 +72,7 @@ test('the frame, and Easy 1 solved on your own by dragging the answers in', asyn
 
   // Everything fits: label between Home and the gear, grid above the numbers, tools on screen.
   const view = page.viewportSize()
-  const label = await page.locator('.level-label').boundingBox()
+  const label = await page.locator('#play-screen .level-label').boundingBox()
   const home = await page.locator('.hub-corner', { hasText: 'Home' }).boundingBox()
   expect(label.x).toBeGreaterThan(home.x + home.width)
   expect(label.x + label.width).toBeLessThan(gear.x)
@@ -79,11 +89,7 @@ test('the frame, and Easy 1 solved on your own by dragging the answers in', asyn
   expect(Math.abs(board.width - board.height)).toBeLessThan(1)
 
   // All but three filled by the computer's own hand (fast), the last three dragged like a finger.
-  await page.evaluate(() => {
-    const c = window.quietNumbers.current
-    const open = c.values.map((v, i) => (v ? -1 : i)).filter((i) => i !== -1)
-    for (const i of open.slice(0, -3)) c.values[i] = c.solution[i]
-  })
+  await fillAllBut(page, 3)
   for (let k = 0; k < 3; k++) {
     const { i, d } = await emptyCell(page)
     await inkBy(page, i, d)
@@ -92,17 +98,18 @@ test('the frame, and Easy 1 solved on your own by dragging the answers in', asyn
   await expect(page.locator('#done-title')).toHaveText('Solved on your own!')
   await expect(page.locator('#done-lines')).toContainText('Easy puzzle 1')
   await expect(page.locator('#done-lines')).toContainText('Time')
+  await expect(page.locator('#next')).toHaveText('Next: puzzle 2')
   await page.locator('#next').click()
   await expect(page.locator('#level-name')).toHaveText('Easy 2')
+  // Home goes up one step: to the book (puzzle 1 solved, on your own), then to the launch page.
   await page.locator('.hub-corner', { hasText: 'Home' }).click()
-  await expect(page.locator('#board-status')).toHaveText('Puzzle 2 is waiting where you left it.')
-  await expect(page.locator('.level-row[aria-checked="true"] b')).toHaveText('2')
-  await expect(page.locator('#history')).toHaveText('Easy history: 1 solved, 1 on your own')
-  await page.locator('#history').click()
-  await expect(page.locator('.history-row')).toHaveCount(1)
-  await expect(page.locator('.history-row .h-n')).toHaveText('Puzzle 1')
-  await expect(page.locator('.history-row .h-how')).toHaveText('On your own')
-  await page.locator('#history-close').click()
+  await expect(page.locator('#book-screen')).toBeVisible()
+  const first = page.locator('.tile').first()
+  await expect(first.locator('.tile-how')).toHaveText('On your own')
+  await expect(page.locator('#start')).toHaveText('Start puzzle 2') // opened, but nothing written yet
+  await page.locator('.hub-corner', { hasText: 'Home' }).click()
+  await expect(page.locator('#board-status')).toHaveText('Next: puzzle 2.')
+  await expect(page.locator('.level-row[aria-checked="true"] b')).toHaveText('1')
   expect(errors).toEqual([])
 })
 
@@ -178,11 +185,7 @@ test('the back of the book: a full grid says how many are wrong; Hint circles th
   await start(page)
   await play(page)
   // Fill all but two squares right, then ink one wrong and one right by dragging.
-  await page.evaluate(() => {
-    const c = window.quietNumbers.current
-    const open = c.values.map((v, i) => (v ? -1 : i)).filter((i) => i !== -1)
-    for (const i of open.slice(0, -2)) c.values[i] = c.solution[i]
-  })
+  await fillAllBut(page, 2)
   const a = await emptyCell(page)
   const b = await emptyCell(page, 1)
   await inkBy(page, a.i, (a.d % 9) + 1)
@@ -208,9 +211,9 @@ test('the back of the book: a full grid says how many are wrong; Hint circles th
   const patch = await cell(page, a.i).evaluate((el) => getComputedStyle(el, '::before').backgroundColor)
   const paper = await cell(page, b.i).evaluate((el) => getComputedStyle(el).backgroundColor)
   expect(patch).not.toBe(paper) // it shows
-  // Kept after closing the app.
+  // Kept after closing the app (Home is the book; Continue opens it again).
   await page.locator('.hub-corner', { hasText: 'Home' }).click()
-  await play(page)
+  await startPicked(page)
   await expect(cell(page, a.i)).toHaveClass(/whiteout/)
   await expect(page.locator('#record')).toHaveText('1 hint')
   await cell(page, a.i).click() // let go of the square, so the drag lands cleanly
@@ -218,7 +221,19 @@ test('the back of the book: a full grid says how many are wrong; Hint circles th
   await expect(page.locator('#done-title')).toHaveText('Solved!')
   await expect(page.locator('#done-lines')).toContainText('1 hint')
   await page.locator('#done-home').click()
-  await expect(page.locator('#history')).toHaveText('Easy history: 1 solved, 0 on your own')
+  // The finished board stays in the book, white-out and all, and is final.
+  const tile = page.locator('.tile').first()
+  await expect(tile.locator('.tile-how')).toHaveText('1 hint')
+  await expect(tile.locator('.mini .w')).toHaveCount(1)
+  await tile.click()
+  await expect(page.locator('#start')).toHaveText('Look at puzzle 1')
+  await page.locator('#start').click()
+  await expect(page.locator('#record')).toContainText('1 hint')
+  await expect(page.locator('#record')).toContainText('Solved')
+  await expect(page.locator('#numbers')).toBeHidden()
+  await expect(page.locator('.bottom-bar')).toBeHidden()
+  await expect(cell(page, a.i)).toHaveClass(/whiteout/)
+  expect(await page.evaluate(() => window.quietNumbers.current.done)).toBeTruthy()
 })
 
 test('Look asks once, shows the answer key, any tap puts it away; then it opens straight away', async ({ page }) => {
@@ -241,19 +256,14 @@ test('Look asks once, shows the answer key, any tap puts it away; then it opens 
   await expect(page.locator('#ask-look')).toBeHidden()
   await expect(page.locator('#answer-key')).toBeVisible()
   await page.locator('#answer-key').click()
-  // Solved after a look: recorded in the history.
-  await page.evaluate(() => {
-    const c = window.quietNumbers.current
-    const open = c.values.map((v, i) => (v ? -1 : i)).filter((i) => i !== -1)
-    for (const i of open.slice(0, -1)) c.values[i] = c.solution[i]
-  })
+  // Solved after a look: it's on the puzzle's page in the book for good.
+  await fillAllBut(page, 1)
   const a = await emptyCell(page)
   await inkBy(page, a.i, a.d)
   await expect(page.locator('#done-lines')).toContainText('Looked')
   await page.locator('#done-home').click()
-  await page.locator('#history').click()
-  await expect(page.locator('.history-row .h-how')).toHaveText('Looked')
-  await expect(page.locator('.history-row .h-how')).not.toHaveClass(/own/)
+  await expect(page.locator('.tile').first().locator('.tile-how')).toHaveText('Looked')
+  await expect(page.locator('.tile').first().locator('.tile-how')).not.toHaveClass(/own/)
 })
 
 for (const how of ['Finger', 'Stylus'])
@@ -286,7 +296,7 @@ test('a half-done puzzle, its time and the difficulty are kept after closing the
   await expect(page.locator('#open-sudoku')).toHaveAttribute('aria-expanded', 'true')
   await page.locator('.level-row', { hasText: 'Hard' }).click()
   await expect(page.locator('#difficulty-note')).toContainText('clever tricks')
-  await expect(page.locator('#board-status')).toHaveText('Puzzle 1 is a fresh page.')
+  await expect(page.locator('#board-status')).toHaveText('Next: puzzle 1.')
   await play(page)
   await expect(page.locator('#level-name')).toHaveText('Hard 1')
   const a = await emptyCell(page)
@@ -295,6 +305,8 @@ test('a half-done puzzle, its time and the difficulty are kept after closing the
   await cell(page, b.i).click()
   await number(page, b.d).click()
   await page.evaluate(() => (window.quietNumbers.current.time = 75))
+  await page.locator('.hub-corner', { hasText: 'Home' }).click()
+  await expect(page.locator('.tile').first().locator('.tile-state')).toHaveText('In progress · 1:15')
   await page.locator('.hub-corner', { hasText: 'Home' }).click()
   await expect(page.locator('#board-status')).toContainText('Puzzle 1 is waiting')
   await page.reload()
@@ -331,14 +343,58 @@ test('settings: hide the stopwatch, warm Night, Reset, and the hidden tools', as
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'day')
   await expect(page.locator('#clock-wrap')).toBeVisible()
 
-  const manual = panel.locator('section', { hasText: 'Set progress by hand' })
-  for (let i = 0; i < 5; i++) await panel.locator('h2').click()
-  await panel.locator('.hub-secret input').fill(FAMILY_CODE)
-  await panel.locator('.hub-secret button').click()
-  await expect(manual).toBeVisible()
-  await manual.getByLabel('Expert puzzle').fill('12')
-  await manual.getByRole('button', { name: 'Set' }).click()
-  await panel.locator('.hub-settings-close').click()
-  await page.locator('.level-row', { hasText: 'Expert' }).click()
-  await expect(page.locator('.level-row', { hasText: 'Expert' }).locator('b')).toHaveText('12')
+  // No hidden set-progress tools: every page of every book is open anyway.
+  await expect(panel.locator('section', { hasText: 'Set progress by hand' })).toHaveCount(0)
+})
+
+test('the book: six puzzles a page, flip with the arrows, Start greys until one is picked', async ({ page }) => {
+  await start(page)
+  await page.locator('#play').click()
+  await expect(page.locator('#book-name')).toHaveText('Easy book')
+  await expect(page.locator('.tile:not([hidden])')).toHaveCount(6)
+  await expect(page.locator('.tile').first()).toHaveAttribute('aria-pressed', 'true') // the puzzle you're on
+  await expect(page.locator('#start')).toHaveText('Start puzzle 1')
+  await expect(page.locator('#first-page')).toBeDisabled()
+  // Everything fits: six tiles above the pager, the pager above Start.
+  const tiles = await page.locator('#tiles').boundingBox()
+  const pager = await page.locator('.pager').boundingBox()
+  const startBox = await page.locator('#start').boundingBox()
+  expect(tiles.y + tiles.height).toBeLessThanOrEqual(pager.y)
+  expect(pager.y + pager.height).toBeLessThanOrEqual(startBox.y)
+  await page.locator('#next-page').click()
+  await expect(page.locator('#page-at')).toHaveText(/^Page 2 of \d+$/)
+  await expect(page.locator('.tile').first().locator('.tile-n')).toHaveText('7')
+  await expect(page.locator('#start')).toBeDisabled()
+  await page.locator('.tile').nth(2).click()
+  await expect(page.locator('#start')).toHaveText('Start puzzle 9')
+  await page.locator('#last-page').click()
+  await expect(page.locator('#next-page')).toBeDisabled()
+  await page.locator('#first-page').click()
+  await expect(page.locator('#page-at')).toHaveText(/^Page 1 of/)
+  // Any page can be played, like a book.
+  await page.locator('#last-page').click()
+  await page.locator('.tile:not([hidden])').last().click()
+  await startPicked(page)
+  const size = await page.evaluate(() => window.quietNumbers.current.n)
+  await expect(page.locator('#level-name')).toHaveText(`Easy ${size}`)
+})
+
+test('finishing a book moves you on to the next one', async ({ page }) => {
+  await start(page)
+  // Every Easy puzzle solved but the last.
+  await page.evaluate(() => {
+    const { books } = window.quietNumbers
+    const size = document.querySelectorAll('.level-size')[0].textContent
+    for (let n = 1; n < Number(size); n++) books.easy[n] = { values: '.'.repeat(81), whiteout: [], checked: [], hints: 0, looked: false, time: 300, done: '2026-10-30' }
+    window.quietNumbers.openBook('easy', Number(size))
+  })
+  await startPicked(page)
+  await fillAllBut(page, 1)
+  const a = await emptyCell(page)
+  await inkBy(page, a.i, a.d)
+  await expect(page.locator('#done-lines')).toContainText('You finished the Easy book!')
+  await expect(page.locator('#next')).toHaveText('Open the Medium book')
+  await page.locator('#next').click()
+  await expect(page.locator('#book-name')).toHaveText('Medium book')
+  await expect(page.locator('#start')).toHaveText('Start puzzle 1')
 })

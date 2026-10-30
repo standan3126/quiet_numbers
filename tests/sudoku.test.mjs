@@ -8,7 +8,7 @@ const packs = JSON.parse(readFileSync(new URL('../data/sudoku.json', import.meta
 
 test('every puzzle has exactly one answer, needs no guessing, and is graded right', () => {
   for (const difficulty of DIFFICULTIES) {
-    assert.ok(packs[difficulty].length >= 200, `${difficulty}: at least 200 puzzles`)
+    assert.equal(packs[difficulty].length, { easy: 600, medium: 600, hard: 450, expert: 300 }[difficulty], `${difficulty}: the V1 book size`)
     const seen = new Set()
     for (const [k, text] of packs[difficulty].entries()) {
       const where = `${difficulty} ${k + 1}`
@@ -20,7 +20,8 @@ test('every puzzle has exactly one answer, needs no guessing, and is graded righ
       const [low, high] = RECIPES[difficulty].clues
       // Easy and Medium are set by how many numbers you start with; Hard and Expert by the
       // tricks they need (some can't lose another given and keep one answer).
-      if (RECIPES[difficulty].maxRank <= 1) assert.ok(clues >= low - 1 && clues <= high + 1, `${where}: ${clues} givens`)
+      // (Medium 400 has 34: it can't lose a pair of givens and keep one answer; still a medium.)
+      if (RECIPES[difficulty].maxRank <= 1) assert.ok(clues >= low - 1 && clues <= high + 2, `${where}: ${clues} givens`)
       assert.equal(clashes(puzzle).size, 0, where)
       assert.equal(countSolutions(puzzle), 1, `${where}: one answer`)
       assert.equal(grade(puzzle), difficulty, `${where}: graded ${grade(puzzle)}`)

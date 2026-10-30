@@ -1,30 +1,32 @@
 /* Quiet Numbers. Shared look (frame, Tap to Start, iPhone sizing, launch page) comes from kit.css.
    Day is white paper with black lines; Night is warm dark paper with amber lines (no blue). */
 
+/* Day: soft cream paper, like an e-reader page (user, 2026-10-30: "a lot softer on the eyes"). */
 html[data-theme='day'] {
-  --bg: #ffffff;
+  --bg: #f6f0e1;
   --ink: #161616;
-  --soft: #6d6b66;
-  --panel: rgba(255, 255, 255, 0.94);
-  --panel-solid: #ffffff;
-  --line: rgba(0, 0, 0, 0.14);
+  --soft: #6b665b;
+  --panel: rgba(251, 247, 238, 0.94);
+  --panel-solid: #fbf7ee;
+  --line: rgba(60, 45, 20, 0.16);
   --accent: #161616;
-  --accent-ink: #ffffff;
-  --hub-topbar: #ffffff;
+  --accent-ink: #fbf7ee;
+  --hub-topbar: #f6f0e1;
+  --hub-veil: rgba(246, 240, 225, 0.7);
   /* The paper */
-  --paper: #ffffff;
+  --paper: #f6f0e1;
   --grid-bold: #111111;
   --grid-thin: rgba(0, 0, 0, 0.32);
   --given: #111111;
   --pen: #1f4f8f;
   --note: #6d6b66;
-  --cross: #f1f1ee; /* the picked square's row and column */
-  --picked: #dfe7f2; /* the picked square */
-  --same: #e9eef5; /* squares holding the picked number */
+  --cross: #ebe4d1; /* the picked square's row and column */
+  --picked: #d9dfe6; /* the picked square */
+  --same: #e2e3de; /* squares holding the picked number */
   --wrong: #c62828; /* Check's circle around a wrong inked number */
-  --whiteout: #ece6d6; /* off-white, so a covered square shows it was changed (user's choice) */
-  --whiteout-edge: rgba(120, 105, 70, 0.28);
-  --found: #e8f1e4; /* the square a hint filled */
+  --whiteout: #ffffff; /* bright white on cream paper, so a covered square shows (user's choice) */
+  --whiteout-edge: rgba(120, 105, 70, 0.3);
+  --found: #e3ead6; /* the square a hint filled */
   color-scheme: light;
 }
 
@@ -98,7 +100,7 @@ button {
 /* --- Home ------------------------------------------------------------------------------------ */
 /* Each kind of information has its own look, so it's easy to find (user, 2026-10-30):
    game name = big and bold; about = plain, soft; section label = small capitals; the puzzle you're
-   on = bold number; a waiting board = an accent line with a dot; history = its own button. */
+   on = bold number; a waiting board = an accent line with a dot. */
 
 .games {
   display: grid;
@@ -243,29 +245,6 @@ button {
   color: var(--pen);
 }
 
-.history-button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  min-height: 46px;
-  margin-top: 12px;
-  padding: 0 16px;
-  border-radius: 12px;
-  border: 1px dashed var(--line);
-  background: transparent;
-  color: var(--ink);
-  font-size: 0.92rem;
-  text-align: left;
-  cursor: pointer;
-}
-
-.history-button::after {
-  content: '›';
-  font-size: 1.4rem;
-  color: var(--soft);
-}
-
 /* Content scrolling under Play fades out instead of running into it. */
 .hub-launch-actions::before {
   content: '';
@@ -285,34 +264,6 @@ button {
   font-size: 0.85rem;
 }
 
-/* History */
-.sheet {
-  width: min(420px, calc(100vw - 20px));
-  max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-  margin-top: calc(env(safe-area-inset-top) + 12px);
-  padding: 16px 18px 20px;
-  border: 1px solid var(--line);
-  border-radius: var(--hub-radius);
-  background: var(--panel-solid);
-  color: var(--ink);
-  box-sizing: border-box;
-}
-
-.sheet::backdrop {
-  background: rgba(20, 14, 8, 0.45);
-}
-
-.sheet-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.sheet-head h2 {
-  margin: 0;
-  font-size: 1.3rem;
-}
-
 .round {
   width: 44px;
   height: 44px;
@@ -323,52 +274,156 @@ button {
   cursor: pointer;
 }
 
-.history-summary {
-  margin: 8px 0 14px;
-  color: var(--soft);
-  font-size: 0.92rem;
+/* --- Book: six puzzles a page ---------------------------------------------------------------- */
+
+.book-area {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: calc(env(safe-area-inset-top) + 70px) 16px calc(env(safe-area-inset-bottom) + 170px);
+  box-sizing: border-box;
+  overflow-y: auto;
 }
 
-.history-list {
+.tiles {
   display: grid;
-  gap: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: min(420px, 100%);
 }
 
-/* One finished puzzle: number and time on the first line, how and when on the second. */
-.history-row {
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 6px 6px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tile[hidden] {
+  display: none;
+}
+
+.tile[aria-pressed='true'] {
+  border: 2px solid var(--accent);
+  padding: 5px 5px 7px;
+}
+
+/* A small picture of the board: givens dark, ink in pen colour, white-out as white squares. */
+.mini {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 2px 12px;
-  padding: 10px 2px;
-  border-top: 1px solid var(--line);
+  grid-template-columns: repeat(9, 1fr);
+  aspect-ratio: 1;
+  margin-bottom: 4px;
+  border: 1.5px solid var(--grid-bold);
+  background: var(--paper);
+  container-type: inline-size;
 }
 
-.h-n {
+.mini span {
+  display: grid;
+  place-items: center;
+  font-size: 7.5cqw;
+  line-height: 1;
+  color: var(--pen);
+  border-right: 0.5px solid var(--grid-thin);
+  border-bottom: 0.5px solid var(--grid-thin);
+}
+
+.mini span:nth-child(9n + 3),
+.mini span:nth-child(9n + 6) {
+  border-right: 1px solid var(--grid-bold);
+}
+
+.mini span:nth-child(n + 19):nth-child(-n + 27),
+.mini span:nth-child(n + 46):nth-child(-n + 54) {
+  border-bottom: 1px solid var(--grid-bold);
+}
+
+.mini .g {
+  color: var(--given);
   font-weight: 700;
 }
 
-.h-time {
-  font-weight: 600;
+.mini .w {
+  background: var(--whiteout);
+}
+
+.tile-n {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.tile-state {
+  font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
 }
 
-.h-how {
-  color: var(--soft);
-  font-size: 0.88rem;
+.tile.solved .tile-state {
+  font-weight: 600;
 }
 
-.h-how.own {
+.tile-how {
+  color: var(--soft);
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.tile-how.own {
   color: var(--pen);
   font-weight: 600;
 }
 
-.h-day {
-  color: var(--soft);
-  font-size: 0.82rem;
-  text-align: right;
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pager .round {
+  display: grid;
+  place-items: center;
+}
+
+.pager svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pager .round:disabled {
+  opacity: 0.3;
+}
+
+.page-at {
+  min-width: 7.5em;
+  margin: 0;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.hub-play:disabled {
+  opacity: 0.35;
+  box-shadow: none;
+}
+
+/* A finished puzzle opened to look at: no numbers or tools, just the board and how it went. */
+.readonly .numbers,
+.readonly .bottom-bar {
+  visibility: hidden;
 }
 
 /* --- Play ------------------------------------------------------------------------------------ */

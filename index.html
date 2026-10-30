@@ -15,7 +15,7 @@
         <h1>Quiet Numbers</h1>
         <p>Number puzzles on clean paper. Take all the time you like.</p>
       </header>
-      <!-- One card per game. Tapping a game opens its card: what it is, how hard, history. -->
+      <!-- One card per game. Tapping a game opens its card: what it is and how hard. Play opens the book. -->
       <div class="games">
         <section class="game-card" id="card-sudoku">
           <button type="button" class="game-head" id="open-sudoku" aria-expanded="true" aria-controls="sudoku-body">
@@ -31,7 +31,6 @@
             <div id="difficulty" class="levels-list" role="radiogroup" aria-label="How hard"></div>
             <p id="difficulty-note" class="difficulty-note"></p>
             <p id="board-status" class="board-status"></p>
-            <button type="button" id="history" class="history-button"></button>
           </div>
         </section>
         <section class="game-card soon">
@@ -47,15 +46,25 @@
       </div>
     </main>
 
-    <!-- History: every finished puzzle of one difficulty, newest first. -->
-    <dialog id="history-dialog" class="sheet">
-      <header class="sheet-head">
-        <h2 id="history-title">Easy history</h2>
-        <button type="button" id="history-close" class="round" aria-label="Close">✕</button>
-      </header>
-      <p id="history-summary" class="history-summary"></p>
-      <ol id="history-list" class="history-list"></ol>
-    </dialog>
+    <!-- A book: six puzzles a page, flip through, pick one, Start. -->
+    <section id="book-screen" class="screen book" hidden>
+      <div class="top-bar">
+        <p class="level-label" id="book-name">Easy book</p>
+      </div>
+      <div class="book-area">
+        <div id="tiles" class="tiles"></div>
+        <nav class="pager" aria-label="Pages">
+          <button type="button" id="first-page" class="round" aria-label="First page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6v12M14 6l-6 6 6 6M20 6l-6 6 6 6"/></svg></button>
+          <button type="button" id="prev-page" class="round" aria-label="Previous page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+          <p id="page-at" class="page-at">Page 1</p>
+          <button type="button" id="next-page" class="round" aria-label="Next page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+          <button type="button" id="last-page" class="round" aria-label="Last page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6v12M10 6l6 6-6 6M4 6l6 6-6 6"/></svg></button>
+        </nav>
+      </div>
+      <div class="hub-launch-actions">
+        <button type="button" class="hub-play" id="start" disabled>Pick a puzzle</button>
+      </div>
+    </section>
 
     <section id="play-screen" class="screen" hidden>
       <div class="top-bar">
@@ -102,7 +111,7 @@
           <h2 id="done-title">Solved!</h2>
           <p id="done-lines" class="soft"></p>
           <button type="button" id="next" class="hub-button">Next puzzle</button>
-          <button type="button" id="done-home" class="pill done-home">Home</button>
+          <button type="button" id="done-home" class="pill done-home">Back to the book</button>
         </div>
       </div>
     </section>
