@@ -3,12 +3,19 @@
 // puzzle maker and the solver; no browser or Node APIs here. The layout comes from the toolbox's
 // Crossword (/shared/v1/crossword.js), passed in so Node tools can load it from the hub folder.
 //
-// A sum is a line of pieces: numbers, and the signs '+', '−', '×', '÷', '=', '√' (before a number)
-// and '²' (after one). × and ÷ come before + and − (like school); √ and ² before both.
+// A sum is a line of pieces, one square each: numbers, a squared number { n, pow: 2 } (the ² stays
+// in the number's square, user 2026-10-30), and the signs '+', '−', '×', '÷', '=', '√' (before a
+// number). √ and ² come first, then × and ÷, then + and − (like school).
 
 import { rng as seeded, shuffle } from './sudoku.js'
 
 export const isNum = (p) => typeof p === 'number'
+export const isPow = (p) => typeof p === 'object' && p !== null
+// A square the player fills: a number or a squared number (the bank tile is the plain number).
+export const isAnswer = (p) => isNum(p) || isPow(p)
+export const answerOf = (p) => (isPow(p) ? p.n : p)
+// The same square holding another value (a squared square stays squared).
+const withValue = (p, v) => (v === null ? null : isPow(p) ? { n: v, pow: p.pow } : v)
 const pick = (random, list) => list[Math.floor(random() * list.length)]
 const int = (random, lo, hi) => lo + Math.floor(random() * (hi - lo + 1))
 
@@ -23,10 +30,8 @@ export function evaluate(pieces) {
       const r = Math.round(Math.sqrt(n))
       if (!isNum(n) || r * r !== n) return null
       terms.push(r)
-    } else if (p === '²') {
-      if (!isNum(terms.at(-1))) return null
-      terms.push(terms.pop() ** 2)
-    } else terms.push(p)
+    } else if (isPow(p)) terms.push(p.n ** p.pow)
+    else terms.push(p)
   }
   // Then × and ÷, then + and −.
   const sums = [terms[0]]
@@ -115,7 +120,7 @@ function expertSum(random) {
     const a = int(random, 3, 13)
     const op = pick(random, ['+', '−'])
     const b = int(random, 2, 40)
-    const left = [a, '²', op, b]
+    const left = [{ n: a, pow: 2 }, op, b]
     const v = evaluate(left)
     return v !== null && v >= 0 ? [...left, '=', v] : expertSum(random)
   }
@@ -127,23 +132,29 @@ function expertSum(random) {
   return twoSigns(random, 20)
 }
 
+// Every difficulty is about the same size (user, 2026-10-30: "easy vs hard doesnt mean less or
+// more puzzle it just means harder questions"): 8 sums and 10 blanks; only the maths changes.
+export const SUMS = 8
+export const BLANKS = 10
+const SIZE = 11
 export const DIFFICULTY_RULES = {
-  easy: { sum: (r) => oneSign(r, true), lines: 6, size: 9, givens: 0.5 },
-  medium: { sum: (r) => oneSign(r, false), lines: 7, size: 11, givens: 0.4 },
-  hard: { sum: (r) => (r() < 0.75 ? twoSigns(r, 12) : oneSign(r, false)), lines: 7, size: 11, givens: 0.33 },
-  expert: { sum: (r) => expertSum(r), lines: 8, size: 11, givens: 0.28 },
+  easy: { sum: (r) => oneSign(r, true) },
+  medium: { sum: (r) => oneSign(r, false) },
+  hard: { sum: (r) => (r() < 0.75 ? twoSigns(r, 12) : oneSign(r, false)) },
+  expert: { sum: (r) => expertSum(r) },
 }
 
 // --- Growing the crossword -------------------------------------------------------------------------
 
 const key = (x, y) => `${x},${y}`
 
-function grow(difficulty, random, Crossword) {
+export function grow(difficulty, random, Crossword) {
   const rules = DIFFICULTY_RULES[difficulty]
-  const limits = { maxWidth: rules.size, maxHeight: rules.size }
+  const limits = { maxWidth: SIZE, maxHeight: SIZE }
+  // Sums cross at plain numbers only (a squared square would read wrong the other way).
   const cw = new Crossword({ canCross: isNum })
   cw.place(rules.sum(random), 0, 0, 'h')
-  for (let fails = 0; cw.lines.length < rules.lines && fails < 300; ) {
+  for (let fails = 0; cw.lines.length < SUMS && fails < 300; ) {
     // A number crossed by one line only, and a new sum through it the other way.
     const open = [...cw.cells].filter(([k, p]) => isNum(p) && !cw.crossed(...k.split(',').map(Number)))
     if (!open.length) break
@@ -194,15 +205,15 @@ export function squaresOf(layout) {
 
 // How many ways the blanks can be filled from the bank so every sum holds (stops at `limit`).
 export function countAnswers(squares, sums, blanks, bank, limit = 2) {
-  const value = squares.map((s, i) => (blanks.has(i) ? null : s.piece))
+  const value = squares.map((s, i) => (blanks.has(i) ? null : answerOf(s.piece)))
   const left = new Map()
   for (const n of bank) left.set(n, (left.get(n) ?? 0) + 1)
   const sumsOf = squares.map(() => [])
   sums.forEach((sum, k) => sum.forEach((i) => sumsOf[i].push(k)))
   const open = (k) => sums[k].filter((i) => value[i] === null).length
+  const whole = (k) => sums[k].map((i) => withValue(squares[i].piece, value[i]) ?? squares[i].piece)
   let count = 0
   const walk = () => {
-    // The blank in the sum closest to done.
     let best = -1
     let bestOpen = Infinity
     for (const i of blanks)
@@ -221,8 +232,7 @@ export function countAnswers(squares, sums, blanks, bank, limit = 2) {
       if (!c) continue
       value[best] = n
       left.set(n, c - 1)
-      const ok = sumsOf[best].every((k) => open(k) > 0 || holds(sums[k].map((i) => value[i])))
-      if (ok) walk()
+      if (sumsOf[best].every((k) => open(k) > 0 || holds(whole(k)))) walk()
       left.set(n, c)
       value[best] = null
       if (count >= limit) return
@@ -232,28 +242,88 @@ export function countAnswers(squares, sums, blanks, bank, limit = 2) {
   return count
 }
 
+// Solves the way a person would, never guessing. Again and again, it finds a sum where only one
+// way of filling its blanks from the bank makes it true, and writes that in: a sum with one blank
+// left (one number fits), or with two blanks (only one pair from the bank fits). Returns the order
+// the blanks were filled, or null if it gets stuck (then the puzzle would need guessing).
+export function solveStepByStep(squares, sums, blanks, bank) {
+  const value = squares.map((s, i) => (blanks.has(i) ? null : answerOf(s.piece)))
+  const left = new Map()
+  for (const n of bank) left.set(n, (left.get(n) ?? 0) + 1)
+  const order = []
+  const piece = (k, n = value[k]) => withValue(squares[k].piece, n) ?? squares[k].piece
+  // Every way to fill these blanks from what's left in the bank that makes the sum true.
+  const ways = (sum, open) => {
+    const found = []
+    const tryFrom = (j, chosen) => {
+      if (j === open.length) {
+        const fill = new Map(open.map((k, x) => [k, chosen[x]]))
+        if (holds(sum.map((k) => (fill.has(k) ? piece(k, fill.get(k)) : piece(k))))) found.push(chosen)
+        return
+      }
+      for (const [n, c] of left) {
+        const used = chosen.filter((m) => m === n).length
+        if (c > used) tryFrom(j + 1, [...chosen, n])
+        if (found.length > 1) return
+      }
+    }
+    tryFrom(0, [])
+    return found
+  }
+  for (let size = 1; order.length < blanks.size; ) {
+    let moved = false
+    for (const sum of sums) {
+      const open = sum.filter((i) => value[i] === null)
+      if (open.length !== size) continue
+      const found = ways(sum, open)
+      if (found.length !== 1) continue
+      open.forEach((k, x) => {
+        value[k] = found[0][x]
+        left.set(found[0][x], left.get(found[0][x]) - 1)
+        order.push(k)
+      })
+      moved = true
+    }
+    // Single blanks first; pairs only when no single one can be done.
+    if (moved) size = 1
+    else if (size === 1) size = 2
+    else return null
+  }
+  return order
+}
+
 // --- A whole puzzle -------------------------------------------------------------------------------
 
-// { width, height, squares: [{ x, y, piece, blank }], bank: [numbers, smallest first], sums }
+// { width, height, squares: [{ x, y, piece, blank }], bank: [numbers, smallest first], sums }, or
+// null when this seed didn't give a puzzle of the right size (the maker tries the next seed).
+// Blanks are taken while the puzzle can still be solved step by step, up to BLANKS.
 export function makePuzzle(difficulty, seed, Crossword) {
   const random = seeded(seed)
-  const rules = DIFFICULTY_RULES[difficulty]
   const layout = grow(difficulty, random, Crossword)
+  if (layout.lines.length < SUMS) return null
   const { squares, sums } = squaresOf(layout)
-  const numbers = squares.map((s, i) => (isNum(s.piece) ? i : -1)).filter((i) => i !== -1)
+  const answers = squares.map((s, i) => (isAnswer(s.piece) ? i : -1)).filter((i) => i !== -1)
   const blanks = new Set()
-  const keep = Math.ceil(numbers.length * rules.givens)
-  for (const i of shuffle(numbers.slice(), random)) {
-    if (numbers.length - blanks.size <= keep) break
+  for (const i of shuffle(answers.slice(), random)) {
+    if (blanks.size >= BLANKS) break
     blanks.add(i)
-    const bank = [...blanks].map((b) => squares[b].piece)
-    if (countAnswers(squares, sums, blanks, bank) !== 1) blanks.delete(i)
+    const bank = [...blanks].map((b) => answerOf(squares[b].piece))
+    if (!solveStepByStep(squares, sums, blanks, bank)) blanks.delete(i)
   }
+  if (blanks.size < BLANKS) return null
   return {
     width: layout.width,
     height: layout.height,
     squares: squares.map((s, i) => ({ ...s, blank: blanks.has(i) })),
-    bank: [...blanks].map((b) => squares[b].piece).sort((a, b) => a - b),
+    bank: [...blanks].map((b) => answerOf(squares[b].piece)).sort((a, b) => a - b),
     sums,
+  }
+}
+
+// The first puzzle a seed family gives (tries seeds name:1, name:2...): { seed, puzzle }.
+export function firstPuzzle(difficulty, name, Crossword) {
+  for (let k = 1; ; k++) {
+    const puzzle = makePuzzle(difficulty, `${name}:${k}`, Crossword)
+    if (puzzle) return { seed: `${name}:${k}`, puzzle }
   }
 }

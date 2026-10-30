@@ -60,10 +60,39 @@
       .sc-num.blank {
         background: #fffdf7;
       }
-      /* Signs: printed lightly, no box, so the numbers stand out. */
+      /* Signs and = get their own boxes too (user, 2026-10-30), printed lighter than numbers. */
       .sc-sign {
+        border: 1.5px solid var(--grid-bold);
+        margin: -0.75px;
+        background: #ebe3cf;
         color: var(--soft);
         font-weight: 600;
+      }
+      /* An empty spot with boxes on all four sides would look like a box: filled dark, like the
+         black squares of a printed crossword. */
+      .sc-hole {
+        background: var(--grid-bold);
+        border: 1.5px solid var(--grid-bold);
+        margin: -0.75px;
+      }
+      /* The ² sits in the top right corner of its number's box, readable even when the box is empty. */
+      .sc-pow {
+        position: relative;
+      }
+      .sc-sq sup {
+        position: absolute;
+        top: 1px;
+        right: 3px;
+        font-size: var(--sup);
+        line-height: 1;
+        color: var(--given);
+        font-weight: 700;
+      }
+      .stats {
+        margin: 10px 0 0;
+        text-align: center;
+        color: var(--soft);
+        font-size: 0.8rem;
       }
       .bank {
         display: flex;
@@ -101,19 +130,27 @@
     <div class="row" id="row"></div>
     <script type="module">
       import { Crossword } from '/shared/v1/crossword.js'
-      import { isNum, makePuzzle } from '../js/sumcross.js'
+      import { answerOf, countAnswers, firstPuzzle, isAnswer, isPow, makePuzzle } from '../js/sumcross.js'
 
       const ABOUT = {
-        easy: 'One sign a sum, small numbers. Half the numbers given.',
+        easy: 'One sign a sum, small numbers.',
         medium: 'One sign a sum, times tables and bigger sums.',
         hard: 'Up to two signs a sum (× and ÷ first).',
-        expert: 'Square roots and squares, two signs, fewest given.',
+        expert: 'Square roots and squares, two signs.',
       }
-      for (const d of ['easy', 'medium', 'hard', 'expert']) {
-        const p = makePuzzle(d, `sumcross:${d}:1`, Crossword)
+      // The first puzzle of each difficulty, then the first Expert one with a squared number.
+      const shows = ['easy', 'medium', 'hard', 'expert'].map((d) => ({ d, title: `${d[0].toUpperCase() + d.slice(1)} 1`, ...firstPuzzle(d, `sumcross:${d}`, Crossword) }))
+      for (let k = 2; ; k++) {
+        const p = makePuzzle('expert', `sumcross:expert:${k}`, Crossword)
+        if (p?.squares.some((s) => isPow(s.piece))) {
+          shows.push({ d: 'expert', title: 'Expert, with a square', puzzle: p })
+          break
+        }
+      }
+      for (const { d, title, puzzle: p } of shows) {
         const size = Math.min(40, Math.floor(370 / Math.max(p.width, p.height)))
         const phone = Object.assign(document.createElement('section'), { className: 'phone' })
-        phone.innerHTML = `<h2>${d[0].toUpperCase() + d.slice(1)} 1</h2><p class="about">${ABOUT[d]}</p>`
+        phone.innerHTML = `<h2>${title}</h2><p class="about">${ABOUT[d]}</p>`
         const board = Object.assign(document.createElement('div'), { className: 'sc-board' })
         board.style.gridTemplateColumns = `repeat(${p.width}, ${size}px)`
         board.style.gridTemplateRows = `repeat(${p.height}, ${size}px)`
@@ -121,16 +158,34 @@
           const sq = document.createElement('span')
           sq.style.gridColumn = s.x + 1
           sq.style.gridRow = s.y + 1
-          const num = isNum(s.piece)
-          sq.className = `sc-sq ${num ? 'sc-num' : 'sc-sign'}${s.blank ? ' blank' : ''}`
-          sq.textContent = s.blank ? '' : s.piece
-          const digits = String(s.piece).length
+          const num = isAnswer(s.piece)
+          sq.className = `sc-sq ${num ? 'sc-num' : 'sc-sign'}${s.blank ? ' blank' : ''}${isPow(s.piece) ? ' sc-pow' : ''}`
+          // A squared number keeps its ² in the same box, also when the number is blank.
+          sq.textContent = s.blank ? '' : answerOf(s.piece)
+          if (isPow(s.piece)) {
+            sq.append(Object.assign(document.createElement('sup'), { textContent: '2' }))
+            sq.style.setProperty('--sup', `${Math.round(size * 0.36)}px`)
+          }
+          const digits = String(answerOf(s.piece)).length + (isPow(s.piece) ? 1 : 0)
           sq.style.fontSize = `${size * (num ? (digits >= 3 ? 0.4 : digits === 2 ? 0.5 : 0.58) : 0.6)}px`
           board.append(sq)
         }
+        const filled = new Set(p.squares.map((s) => `${s.x},${s.y}`))
+        for (let y = 0; y < p.height; y++)
+          for (let x = 0; x < p.width; x++) {
+            if (filled.has(`${x},${y}`)) continue
+            if (![[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dy]) => filled.has(`${x + dx},${y + dy}`))) continue
+            const hole = Object.assign(document.createElement('span'), { className: 'sc-hole' })
+            hole.style.gridColumn = x + 1
+            hole.style.gridRow = y + 1
+            board.append(hole)
+          }
         const bank = Object.assign(document.createElement('div'), { className: 'bank' })
         bank.append(...p.bank.map((n) => Object.assign(document.createElement('span'), { textContent: n })))
-        phone.append(board, Object.assign(document.createElement('p'), { className: 'bank-label', textContent: 'Number bank' }), bank)
+        const blanks = new Set(p.squares.map((s, i) => (s.blank ? i : -1)).filter((i) => i >= 0))
+        const stats = Object.assign(document.createElement('p'), { className: 'stats' })
+        stats.textContent = `${p.sums.length} sums · ${blanks.size} blanks · ${p.width}×${p.height} · answers: ${countAnswers(p.squares, p.sums, blanks, p.bank, 5)}`
+        phone.append(board, stats, Object.assign(document.createElement('p'), { className: 'bank-label', textContent: 'Number bank' }), bank)
         document.getElementById('row').append(phone)
       }
     </script>
