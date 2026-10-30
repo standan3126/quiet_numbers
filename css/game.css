@@ -1,0 +1,843 @@
+/* Quiet Numbers. Shared look (frame, Tap to Start, iPhone sizing, launch page) comes from kit.css.
+   Day is white paper with black lines; Night is warm dark paper with amber lines (no blue). */
+
+html[data-theme='day'] {
+  --bg: #ffffff;
+  --ink: #161616;
+  --soft: #6d6b66;
+  --panel: rgba(255, 255, 255, 0.94);
+  --panel-solid: #ffffff;
+  --line: rgba(0, 0, 0, 0.14);
+  --accent: #161616;
+  --accent-ink: #ffffff;
+  --hub-topbar: #ffffff;
+  /* The paper */
+  --paper: #ffffff;
+  --grid-bold: #111111;
+  --grid-thin: rgba(0, 0, 0, 0.32);
+  --given: #111111;
+  --pen: #1f4f8f;
+  --note: #6d6b66;
+  --cross: #f1f1ee; /* the picked square's row and column */
+  --picked: #dfe7f2; /* the picked square */
+  --same: #e9eef5; /* squares holding the picked number */
+  --wrong: #c62828; /* Check's circle around a wrong inked number */
+  --whiteout: #ece6d6; /* off-white, so a covered square shows it was changed (user's choice) */
+  --whiteout-edge: rgba(120, 105, 70, 0.28);
+  --found: #e8f1e4; /* the square a hint filled */
+  color-scheme: light;
+}
+
+html[data-theme='night'] {
+  --bg: #1a0e06;
+  --ink: #ffb46a;
+  --soft: #c98a52;
+  --panel: rgba(48, 28, 14, 0.95);
+  --panel-solid: #2c190c;
+  --line: rgba(255, 180, 106, 0.2);
+  --accent: #e8913f;
+  --accent-ink: #1a0e06;
+  --hub-topbar: #1a0e06;
+  --hub-veil: rgba(26, 14, 6, 0.7);
+  --paper: #22140a;
+  --grid-bold: #e0a060;
+  --grid-thin: rgba(224, 160, 96, 0.34);
+  --given: #f4d3a6;
+  --pen: #f0913a;
+  --note: #b98a5c;
+  --cross: rgba(255, 180, 106, 0.08);
+  --picked: rgba(255, 180, 106, 0.24);
+  --same: rgba(255, 180, 106, 0.14);
+  --wrong: #ff5a3c;
+  --whiteout: #3a2a1a;
+  --whiteout-edge: rgba(255, 210, 160, 0.3);
+  --found: rgba(200, 170, 80, 0.2);
+  color-scheme: dark;
+}
+
+/* [data-theme] so these win over kit.css's :root colors. */
+html[data-theme] {
+  --hub-bg: var(--bg);
+  --hub-ink: var(--ink);
+  --hub-soft: var(--soft);
+  --hub-panel: var(--panel);
+  --hub-line: var(--line);
+  --hub-accent: var(--accent);
+  --hub-accent-ink: var(--accent-ink);
+  --hub-panel-solid: var(--panel-solid);
+}
+
+body {
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.soft {
+  color: var(--soft);
+}
+
+.pill {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* --- Home ------------------------------------------------------------------------------------ */
+/* Each kind of information has its own look, so it's easy to find (user, 2026-10-30):
+   game name = big and bold; about = plain, soft; section label = small capitals; the puzzle you're
+   on = bold number; a waiting board = an accent line with a dot; history = its own button. */
+
+.games {
+  display: grid;
+  gap: 12px;
+  width: min(380px, 100%);
+}
+
+.game-card {
+  border-radius: var(--hub-radius);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.game-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 60px;
+  padding: 14px 20px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.game-name {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+/* A chevron that points down when closed, up when open. */
+.game-chevron {
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  border-right: 2.5px solid currentColor;
+  border-bottom: 2.5px solid currentColor;
+  transform: translateY(-3px) rotate(45deg);
+  transition: transform 0.2s ease;
+}
+
+.game-head[aria-expanded='true'] .game-chevron {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.game-body {
+  padding: 0 20px 18px;
+}
+
+.game-body[hidden] {
+  display: none;
+}
+
+.game-about {
+  margin: 0 0 16px;
+  color: var(--soft);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.label {
+  margin: 0 0 8px;
+  color: var(--soft);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.levels-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* A difficulty: its name, and the puzzle you're on in bold. */
+.level-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  min-height: 58px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: transparent;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.level-row[aria-checked='true'] {
+  border: 2px solid var(--accent);
+  padding: 0 13px;
+  background: var(--panel-solid);
+}
+
+.level-name {
+  font-weight: 600;
+}
+
+.level-at {
+  color: var(--soft);
+  font-size: 0.9rem;
+}
+
+.level-at b {
+  margin-left: 0.25em;
+  color: var(--ink);
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.difficulty-note {
+  margin: 10px 0 0;
+  color: var(--soft);
+  font-size: 0.9rem;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.board-status {
+  margin: 12px 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.board-status.waiting::before {
+  content: '';
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--pen);
+}
+
+.board-status.waiting {
+  color: var(--pen);
+}
+
+.history-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 46px;
+  margin-top: 12px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px dashed var(--line);
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.92rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-button::after {
+  content: '›';
+  font-size: 1.4rem;
+  color: var(--soft);
+}
+
+/* Content scrolling under Play fades out instead of running into it. */
+.hub-launch-actions::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -36px -16px calc(-24px - env(safe-area-inset-bottom));
+  background: linear-gradient(transparent, var(--bg) 40px);
+  pointer-events: none;
+}
+
+.game-card.soon {
+  opacity: 0.6;
+}
+
+.soon-tag {
+  color: var(--soft);
+  font-size: 0.85rem;
+}
+
+/* History */
+.sheet {
+  width: min(420px, calc(100vw - 20px));
+  max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  margin-top: calc(env(safe-area-inset-top) + 12px);
+  padding: 16px 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--hub-radius);
+  background: var(--panel-solid);
+  color: var(--ink);
+  box-sizing: border-box;
+}
+
+.sheet::backdrop {
+  background: rgba(20, 14, 8, 0.45);
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sheet-head h2 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.round {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.history-summary {
+  margin: 8px 0 14px;
+  color: var(--soft);
+  font-size: 0.92rem;
+}
+
+.history-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One finished puzzle: number and time on the first line, how and when on the second. */
+.history-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  padding: 10px 2px;
+  border-top: 1px solid var(--line);
+}
+
+.h-n {
+  font-weight: 700;
+}
+
+.h-time {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.h-how {
+  color: var(--soft);
+  font-size: 0.88rem;
+}
+
+.h-how.own {
+  color: var(--pen);
+  font-weight: 600;
+}
+
+.h-day {
+  color: var(--soft);
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+/* --- Play ------------------------------------------------------------------------------------ */
+
+.screen {
+  position: fixed;
+  inset: 0;
+}
+
+html.ios-app .screen {
+  height: 100lvh;
+}
+
+html.ios-solid-bar .screen {
+  height: var(--app-height, 100%);
+}
+
+.screen[hidden] {
+  display: none;
+}
+
+/* Level and stopwatch sit just left of the shared Settings gear (44 px + a gap). */
+.top-bar {
+  position: absolute;
+  z-index: 2;
+  top: calc(env(safe-area-inset-top) + 10px);
+  right: calc(env(safe-area-inset-right) + 62px);
+}
+
+.level-label {
+  margin: 0;
+  min-height: 44px;
+  line-height: 42px;
+  padding: 0 16px;
+  white-space: nowrap;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+}
+
+#clock-wrap[hidden] {
+  display: none;
+}
+
+/* Top to bottom: room for the frame, the grid (as big as fits), the numbers, the tools. */
+.play-area {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: calc(env(safe-area-inset-top) + 66px) 8px calc(env(safe-area-inset-bottom) + 10px);
+  box-sizing: border-box;
+}
+
+.grid {
+  --cell: calc(var(--grid-size, 340px) / 9);
+  flex: none;
+  height: var(--grid-size, 340px);
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  width: var(--grid-size, 340px);
+  height: var(--grid-size, 340px);
+  box-sizing: border-box;
+  border: 3px solid var(--grid-bold);
+  background: var(--paper);
+}
+
+.cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid var(--grid-thin);
+  border-bottom: 1px solid var(--grid-thin);
+  background: var(--paper);
+  font-size: calc(var(--cell) * 0.6);
+  line-height: 1;
+  color: var(--pen);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.cell:nth-child(9n) {
+  border-right: 0;
+}
+
+.cell:nth-child(9n + 3),
+.cell:nth-child(9n + 6) {
+  border-right: 2px solid var(--grid-bold);
+}
+
+.cell:nth-child(n + 19):nth-child(-n + 27),
+.cell:nth-child(n + 46):nth-child(-n + 54) {
+  border-bottom: 2px solid var(--grid-bold);
+}
+
+.cell:nth-child(n + 73) {
+  border-bottom: 0;
+}
+
+.cell.given {
+  color: var(--given);
+  font-weight: 700;
+}
+
+.cell.cross {
+  background: var(--cross);
+}
+
+.cell.same {
+  background: var(--same);
+}
+
+.cell.picked {
+  background: var(--picked);
+}
+
+.cell.found {
+  background: var(--found);
+}
+
+/* White-out: an off-white patch with a soft edge, a little smaller than the square, that stays. */
+.cell.whiteout {
+  isolation: isolate; /* so the patch can sit under the number */
+}
+
+.cell.whiteout::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 8%;
+  border-radius: 3px 5px 4px 6px;
+  background: var(--whiteout);
+  box-shadow: 0 0 0 1px var(--whiteout-edge);
+  pointer-events: none;
+}
+
+/* Check: a red pencil circle around a wrong inked number, until it's whited out. */
+.cell.checked::after {
+  content: '';
+  position: absolute;
+  inset: 10%;
+  border: 2px solid var(--wrong);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.whiteout-icon {
+  display: inline-block;
+  width: 1.1em;
+  height: 0.8em;
+  margin: 0.15em 0;
+  border-radius: 3px;
+  background: var(--whiteout);
+  box-shadow: 0 0 0 1.5px currentColor;
+}
+
+/* Notes of the number being looked for stand out. */
+.notes .look {
+  color: var(--pen);
+  font-weight: 700;
+}
+
+/* Under the grid: "On your own so far", or how often Hint and Check were used. */
+.status {
+  display: flex;
+  justify-content: flex-start;
+  width: var(--grid-size, 340px);
+}
+
+.record {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 20px;
+}
+
+.notes {
+  position: absolute;
+  inset: 1px;
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  place-items: center;
+  font-size: calc(var(--cell) * 0.27);
+  color: var(--note);
+}
+
+/* The number row: tap a number, then the squares it goes in. */
+.numbers {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 4px;
+  width: var(--grid-size, 340px);
+  min-width: 300px;
+  max-width: calc(100vw - 16px);
+}
+
+.number {
+  min-height: 52px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 1.55rem;
+  font-weight: 600;
+  color: var(--pen);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.number {
+  touch-action: none; /* so a drag moves the number instead of the page */
+}
+
+/* The number being dragged, a square's size, centred where it will land: floating above a
+   finger, or right at a stylus tip (see dropPoint in main.js). The ringed square is where it goes. */
+.ghost {
+  position: fixed;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: calc(var(--grid-size, 340px) / 9 + 6px);
+  height: calc(var(--grid-size, 340px) / 9 + 6px);
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: calc(var(--grid-size, 340px) / 9 * 0.62);
+  font-weight: 600;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+/* At a stylus tip the number covers its square, so it's see-through. */
+html[data-input='stylus'] .ghost {
+  opacity: 0.6;
+}
+
+.ghost[hidden] {
+  display: none;
+}
+
+.cell.drop {
+  box-shadow: inset 0 0 0 3px var(--accent);
+}
+
+.number[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* Every one of this number is in place. Still tappable. */
+.number.full {
+  opacity: 0.35;
+}
+
+.bottom-bar {
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 22px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.1);
+}
+
+.tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 58px;
+  min-height: 54px;
+  padding: 6px 6px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  font-size: 0.8rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.tool span {
+  font-size: 1.3rem;
+  line-height: 1.1;
+}
+
+.tool:active {
+  background: var(--line);
+}
+
+.tool small {
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.tool small:empty {
+  display: none;
+}
+
+.tool[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.tool.waiting {
+  opacity: 0.45;
+}
+
+.toast,
+.coach {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: var(--above-numbers, 140px);
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  max-width: calc(100vw - 32px);
+  border-radius: 14px;
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+}
+
+.toast.top,
+.coach.top {
+  top: calc(env(safe-area-inset-top) + 66px);
+  bottom: auto;
+}
+
+.toast {
+  margin: 0;
+  width: max-content;
+  padding: 10px 16px;
+  text-align: center;
+  line-height: 1.4;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.toast.show {
+  opacity: 1;
+}
+
+.coach {
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.coach[hidden] {
+  display: none;
+}
+
+.coach p {
+  margin: 0;
+  flex: 1;
+  line-height: 1.4;
+}
+
+.done {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+}
+
+.done[hidden] {
+  display: none;
+}
+
+.done-card {
+  min-width: min(280px, 100%);
+  padding: 28px 30px;
+  border-radius: var(--hub-radius);
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
+}
+
+.done-card h2 {
+  margin: 0 0 10px;
+}
+
+#done-lines {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.done-home {
+  display: block;
+  margin: 10px auto 0;
+}
+
+.ask-note {
+  max-width: 260px;
+  margin: 0 auto 18px;
+  line-height: 1.4;
+}
+
+/* The answer key: the whole solution over the page; any tap puts it away. */
+.answer-key {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.answer-key[hidden] {
+  display: none;
+}
+
+.answer-title {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.answer-board {
+  --cell: calc(var(--grid-size, 340px) / 9);
+}
+
+.answer-board .cell {
+  color: var(--pen);
+}
+
+.answer-board .cell.given {
+  color: var(--given);
+}
+
+.answer-close {
+  margin: 0;
+  color: var(--soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    transition: none;
+  }
+}

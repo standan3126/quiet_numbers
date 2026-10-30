@@ -1,0 +1,33 @@
+// Screenshots at phone sizes into private/ (for looking, not a test): node tools/shots.mjs
+import { chromium } from '@playwright/test'
+const browser = await chromium.launch()
+for (const [name, w, h] of [['small', 360, 640], ['iphone', 390, 844]]) {
+  const page = await browser.newPage({ viewport: { width: w, height: h }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 })
+  const errors = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  await page.goto('http://localhost:4230/quiet-numbers/')
+  await page.evaluate(() => localStorage.clear())
+  await page.reload()
+  await page.locator('.hub-start button', { hasText: 'Finger' }).click()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `private/shot-${name}-home.png` })
+  await page.locator('#play').click()
+  await page.locator('#coach-ok').click()
+  await page.locator('.number').nth(4).click()
+  const empty = await page.evaluate(() => window.quietNumbers.current.values.findIndex((v) => !v))
+  await page.locator('.cell').nth(empty).click()
+  await page.locator('#pencil').click()
+  await page.locator('.number').nth(4).click()
+  await page.locator('.number').nth(2).click()
+  const e2 = await page.evaluate(() => window.quietNumbers.current.values.findIndex((v) => !v))
+  await page.locator('.cell').nth(e2).click()
+  await page.locator('.number').nth(6).click()
+  await page.locator('.cell').nth(e2).click()
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: `private/shot-${name}-play.png` })
+  await page.evaluate(() => window.quietNumbers.panel.set({ light: 'night' }))
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: `private/shot-${name}-night.png` })
+  console.log(name, errors)
+}
+await browser.close()

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en" data-theme="day">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Quiet Numbers · GameHub</title>
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="stylesheet" href="/shared/v1/kit.css" />
+    <link rel="stylesheet" href="/shared/v1/settings.css" />
+    <link rel="stylesheet" href="css/game.css" />
+  </head>
+  <body>
+    <main id="home" class="hub-launch">
+      <header class="hub-launch-head">
+        <h1>Quiet Numbers</h1>
+        <p>Number puzzles on clean paper. Take all the time you like.</p>
+      </header>
+      <!-- One card per game. Tapping a game opens its card: what it is, how hard, history. -->
+      <div class="games">
+        <section class="game-card" id="card-sudoku">
+          <button type="button" class="game-head" id="open-sudoku" aria-expanded="true" aria-controls="sudoku-body">
+            <span class="game-name">Sudoku</span>
+            <span class="game-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="game-body" id="sudoku-body">
+            <p class="game-about">
+              Every row, column and box holds 1 to 9 once. Tap to pencil, drag to ink. Like a
+              puzzle book, nothing is checked until the grid is full.
+            </p>
+            <p class="label">How hard?</p>
+            <div id="difficulty" class="levels-list" role="radiogroup" aria-label="How hard"></div>
+            <p id="difficulty-note" class="difficulty-note"></p>
+            <p id="board-status" class="board-status"></p>
+            <button type="button" id="history" class="history-button"></button>
+          </div>
+        </section>
+        <section class="game-card soon">
+          <div class="game-head">
+            <span class="game-name">Math Crossword</span>
+            <span class="soon-tag">Coming next</span>
+          </div>
+        </section>
+      </div>
+      <div class="hub-launch-actions">
+        <button type="button" class="hub-play" id="play">Play</button>
+        <button type="button" class="hub-levels" id="levels" hidden>Levels</button>
+      </div>
+    </main>
+
+    <!-- History: every finished puzzle of one difficulty, newest first. -->
+    <dialog id="history-dialog" class="sheet">
+      <header class="sheet-head">
+        <h2 id="history-title">Easy history</h2>
+        <button type="button" id="history-close" class="round" aria-label="Close">✕</button>
+      </header>
+      <p id="history-summary" class="history-summary"></p>
+      <ol id="history-list" class="history-list"></ol>
+    </dialog>
+
+    <section id="play-screen" class="screen" hidden>
+      <div class="top-bar">
+        <p class="level-label">
+          <span id="level-name">Easy 1</span><span id="clock-wrap"> · <span id="clock">0:00</span></span>
+        </p>
+      </div>
+      <div class="play-area">
+        <div id="grid" class="grid">
+          <div id="board" class="board" role="grid" aria-label="Sudoku grid"></div>
+        </div>
+        <div class="status">
+          <p id="record" class="record soft"></p>
+        </div>
+        <div id="numbers" class="numbers" aria-label="Numbers"></div>
+        <p id="toast" class="toast" role="status"></p>
+        <div id="coach" class="coach" hidden>
+          <p id="coach-text"></p>
+          <button type="button" id="coach-ok" class="pill">Got it</button>
+        </div>
+        <nav class="bottom-bar">
+          <button type="button" id="erase" class="tool"><span aria-hidden="true">⌫</span>Erase</button>
+          <button type="button" id="whiteout" class="tool"><span aria-hidden="true" class="whiteout-icon"></span>White-out</button>
+          <button type="button" id="hint" class="tool"><span aria-hidden="true">◯</span>Hint <small id="hint-wait"></small></button>
+          <button type="button" id="look" class="tool"><span aria-hidden="true">▤</span>Look</button>
+        </nav>
+      </div>
+      <!-- Look: the answer key, after asking once. Tap anywhere to put it away. -->
+      <div id="ask-look" class="done" hidden>
+        <div class="done-card">
+          <h2>Look at the answer key?</h2>
+          <p class="soft ask-note">It stays open to you for this puzzle, and the puzzle is marked as solved with a look.</p>
+          <button type="button" id="look-yes" class="hub-button">Look</button>
+          <button type="button" id="look-no" class="pill done-home">Not now</button>
+        </div>
+      </div>
+      <div id="answer-key" class="answer-key" hidden>
+        <p class="answer-title">Answer key</p>
+        <div id="answer-board" class="board answer-board" aria-label="The answer key"></div>
+        <p class="answer-close">Tap anywhere to close</p>
+      </div>
+      <div id="done" class="done" hidden>
+        <div class="done-card">
+          <h2 id="done-title">Solved!</h2>
+          <p id="done-lines" class="soft"></p>
+          <button type="button" id="next" class="hub-button">Next puzzle</button>
+          <button type="button" id="done-home" class="pill done-home">Home</button>
+        </div>
+      </div>
+    </section>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
