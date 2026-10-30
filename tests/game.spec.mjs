@@ -109,7 +109,7 @@ test('the frame, and Easy 1 solved on your own by dragging the answers in', asyn
   await expect(page.locator('#start')).toHaveText('Start puzzle 2') // opened, but nothing written yet
   await page.locator('.hub-corner', { hasText: 'Home' }).click()
   await expect(page.locator('#board-status')).toHaveText('Next: puzzle 2.')
-  await expect(page.locator('.level-row[aria-checked="true"] b')).toHaveText('1')
+  await expect(page.locator('#sudoku-body .level-row[aria-checked="true"] b')).toHaveText('1')
   expect(errors).toEqual([])
 })
 
@@ -294,7 +294,7 @@ test('a half-done puzzle, its time and the difficulty are kept after closing the
   await start(page)
   // The game card is open; pick Hard.
   await expect(page.locator('#open-sudoku')).toHaveAttribute('aria-expanded', 'true')
-  await page.locator('.level-row', { hasText: 'Hard' }).click()
+  await page.locator('#sudoku-body .level-row', { hasText: 'Hard' }).click()
   await expect(page.locator('#difficulty-note')).toContainText('clever tricks')
   await expect(page.locator('#board-status')).toHaveText('Next: puzzle 1.')
   await play(page)
@@ -311,7 +311,7 @@ test('a half-done puzzle, its time and the difficulty are kept after closing the
   await expect(page.locator('#board-status')).toContainText('Puzzle 1 is waiting')
   await page.reload()
   await page.locator('.hub-start button', { hasText: 'Finger' }).click()
-  await expect(page.locator('.level-row[aria-checked="true"] .level-name')).toHaveText('Hard')
+  await expect(page.locator('#sudoku-body .level-row[aria-checked="true"] .level-name')).toHaveText('Hard')
   await play(page)
   expect((await state(page)).values[a.i]).toBe(a.d)
   expect((await state(page)).notes[b.i]).toBe(bit(b.d))
@@ -350,7 +350,7 @@ test('settings: hide the stopwatch, warm Night, Reset, and the hidden tools', as
 test('the book: six puzzles a page, flip with the arrows, Start greys until one is picked', async ({ page }) => {
   await start(page)
   await page.locator('#play').click()
-  await expect(page.locator('#book-name')).toHaveText('Easy book')
+  await expect(page.locator('#book-name')).toHaveText('Sudoku · Easy')
   await expect(page.locator('.hub-book-tile:not([hidden])')).toHaveCount(6)
   await expect(page.locator('.hub-book-tile').first()).toHaveAttribute('aria-pressed', 'true') // the puzzle you're on
   await expect(page.locator('#start')).toHaveText('Start puzzle 1')
@@ -385,8 +385,8 @@ test('finishing a book moves you on to the next one', async ({ page }) => {
   await page.evaluate(() => {
     const { books } = window.quietNumbers
     const size = document.querySelectorAll('.level-size')[0].textContent
-    for (let n = 1; n < Number(size); n++) books.easy[n] = { values: '.'.repeat(81), whiteout: [], checked: [], hints: 0, looked: false, time: 300, done: '2026-10-30' }
-    window.quietNumbers.openBook('easy', Number(size))
+    for (let n = 1; n < Number(size); n++) books.sudoku.easy[n] = { values: '.'.repeat(81), whiteout: [], checked: [], hints: 0, looked: false, time: 300, done: '2026-10-30' }
+    window.quietNumbers.openBook('sudoku', 'easy', Number(size))
   })
   await startPicked(page)
   await fillAllBut(page, 1)
@@ -395,7 +395,7 @@ test('finishing a book moves you on to the next one', async ({ page }) => {
   await expect(page.locator('#done-lines')).toContainText('You finished the Easy book!')
   await expect(page.locator('#next')).toHaveText('Open the Medium book')
   await page.locator('#next').click()
-  await expect(page.locator('#book-name')).toHaveText('Medium book')
+  await expect(page.locator('#book-name')).toHaveText('Sudoku · Medium')
   await expect(page.locator('#start')).toHaveText('Start puzzle 1')
 })
 

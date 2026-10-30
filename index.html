@@ -34,10 +34,20 @@
             <p id="board-status" class="board-status"></p>
           </div>
         </section>
-        <section class="game-card soon">
-          <div class="game-head">
-            <span class="game-name">Math Crossword</span>
-            <span class="soon-tag">Coming next</span>
+        <section class="game-card" id="card-sumcross">
+          <button type="button" class="game-head" id="open-sumcross" aria-expanded="false" aria-controls="sumcross-body">
+            <span class="game-name">Sum Cross</span>
+            <span class="game-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="game-body" id="sumcross-body" hidden>
+            <p class="game-about">
+              A crossword of sums that must all come out true, across and down. Fill the empty
+              boxes from the number bank. Tap to pencil, drag to ink.
+            </p>
+            <p class="label">How hard?</p>
+            <div id="sumcross-difficulty" class="levels-list" role="radiogroup" aria-label="How hard"></div>
+            <p id="sumcross-difficulty-note" class="difficulty-note"></p>
+            <p id="sumcross-board-status" class="board-status"></p>
           </div>
         </section>
       </div>
@@ -66,10 +76,15 @@
         <div id="grid" class="grid">
           <div id="board" class="board" role="grid" aria-label="Sudoku grid"></div>
         </div>
+        <!-- Sum Cross: the crossword (pinch to zoom, drag to move) and its number bank. -->
+        <div id="sc-view" class="sc-view" hidden>
+          <div id="sc-board" class="sc-board" role="grid" aria-label="Sum Cross puzzle"></div>
+        </div>
         <div class="status">
           <p id="record" class="record soft"></p>
         </div>
         <div id="numbers" class="numbers" aria-label="Numbers"></div>
+        <div id="bank" class="bank" aria-label="Number bank" hidden></div>
         <p id="toast" class="toast" role="status"></p>
         <nav class="bottom-bar">
           <button type="button" id="erase" class="tool"><span aria-hidden="true">⌫</span>Erase</button>
@@ -81,7 +96,7 @@
       <!-- The rules (the ? under the gear; opens by itself the first time). The clock stops while
            it's open. Tap anywhere to close. -->
       <div id="rules" class="rules" hidden>
-        <div class="rules-card">
+        <div class="rules-card" id="rules-sudoku">
           <h2>How to play</h2>
           <p class="rules-lead">Like a puzzle book: every row, column and 3×3 box holds 1 to 9 once.</p>
           <dl>
@@ -95,6 +110,25 @@
             <dd>The back of the book. Hint circles any wrong ink (then wait 2 minutes for the next). Look opens the answer key. Both are always there, and both are noted on the puzzle. Solve without them and it counts as <b>on your own</b>.</dd>
             <dt>The clock</dt>
             <dd>Counts only while the board is in front of you. It stops for these rules, Settings, the answer key, and when you leave.</dd>
+          </dl>
+          <p class="rules-close">Tap anywhere to close</p>
+        </div>
+        <div class="rules-card" id="rules-sumcross" hidden>
+          <h2>How to play</h2>
+          <p class="rules-lead">A crossword of sums: every sum across and down must come out true. √ and ² go first, then × and ÷, then + and −.</p>
+          <dl>
+            <dt>Pencil: tap</dt>
+            <dd>Tap an empty box, then numbers in the bank, to note them small. Or tap a number, then boxes. Tap a note again to take it out. Notes are never checked.</dd>
+            <dt>Pen: drag</dt>
+            <dd>Drag a number from the bank onto a box to ink it. Each bank number goes in once. Nothing is checked until every box is full; then you hear whether it's solved, or how many boxes are wrong.</dd>
+            <dt>Erase and White-out</dt>
+            <dd>Erase clears the pencil notes in a box. White-out covers ink with a white patch that stays and gives the number back to the bank. Solved puzzles are final.</dd>
+            <dt>Hint and Look</dt>
+            <dd>The back of the book. Hint circles any wrong ink (then wait 2 minutes for the next). Look opens the answer key. Both are always there, and both are noted on the puzzle. Solve without them and it counts as <b>on your own</b>.</dd>
+            <dt>Moving around</dt>
+            <dd>Pinch to zoom in, drag the puzzle to move it. Tap a box to light up its sums.</dd>
+            <dt>The clock</dt>
+            <dd>Counts only while the puzzle is in front of you. It stops for these rules, Settings, the answer key, and when you leave.</dd>
           </dl>
           <p class="rules-close">Tap anywhere to close</p>
         </div>
@@ -112,6 +146,7 @@
       <div id="answer-key" class="answer-key" hidden>
         <p class="answer-title">Answer key</p>
         <div id="answer-board" class="board answer-board" aria-label="The answer key"></div>
+        <div id="sc-answer" class="sc-board sc-answer" aria-label="The answer key" hidden></div>
         <p class="answer-close">Tap anywhere to close</p>
       </div>
       <div id="done" class="done" hidden>
