@@ -50,6 +50,26 @@
             <p id="sumcross-board-status" class="board-status"></p>
           </div>
         </section>
+        <section class="game-card" id="card-mathbash">
+          <button type="button" class="game-head" id="open-mathbash" aria-expanded="false" aria-controls="mathbash-body">
+            <span class="game-name">Math Bash</span>
+            <span class="game-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="game-body" id="mathbash-body" hidden>
+            <p class="game-about">
+              Mental maths, no calculator. A 100-question test graded like school, or a Pop Quiz:
+              how many can you get right in one minute?
+            </p>
+            <p class="label">What?</p>
+            <div id="mathbash-category" class="chips-list" role="radiogroup" aria-label="What"></div>
+            <p class="label">How hard?</p>
+            <div id="mathbash-difficulty" class="levels-list" role="radiogroup" aria-label="How hard"></div>
+            <p id="mathbash-difficulty-note" class="difficulty-note"></p>
+            <p class="label">Test or Pop Quiz?</p>
+            <div id="mathbash-mode" class="levels-list" role="radiogroup" aria-label="Test or Pop Quiz"></div>
+            <p id="mathbash-board-status" class="board-status"></p>
+          </div>
+        </section>
       </div>
       <div class="hub-launch-actions">
         <button type="button" class="hub-play" id="play">Play</button>
@@ -155,6 +175,73 @@
           <p id="done-lines" class="soft"></p>
           <button type="button" id="next" class="hub-button">Next puzzle</button>
           <button type="button" id="done-home" class="pill done-home">Back to the book</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Math Bash (js/mathbash-play.js): a test or a Pop Quiz, one question at a time. -->
+    <section id="mb-screen" class="screen mb" hidden>
+      <div class="top-bar">
+        <p class="level-label">
+          <span id="mb-name">Test 1</span><span id="mb-clock-wrap"> · <span id="mb-clock">0:00</span></span>
+        </p>
+      </div>
+      <div id="mb-ask-area" class="mb-area">
+        <div class="mb-ask">
+          <div class="mb-moves">
+            <button type="button" id="mb-back" class="pill">Back</button>
+            <p id="mb-count" class="mb-count">Question 1 of 100</p>
+            <button type="button" id="mb-review" class="pill">Review</button>
+          </div>
+          <p id="mb-question" class="mb-question"></p>
+          <p id="mb-answer" class="mb-answer empty" aria-live="polite"></p>
+          <p id="mb-flash" class="mb-flash" role="status"></p>
+        </div>
+        <div id="mb-keypad" class="mb-keypad" aria-label="Keypad"></div>
+      </div>
+      <!-- Review: every answer before handing in. The clock keeps going. -->
+      <div id="mb-sheet" class="mb-sheet" hidden>
+        <div class="mb-sheet-head">
+          <h2>Review</h2>
+          <p id="mb-sheet-note" class="soft"></p>
+        </div>
+        <div id="mb-list" class="mb-list"></div>
+        <div class="hub-launch-actions"><button type="button" class="hub-play" id="mb-handin">Hand in</button></div>
+      </div>
+      <!-- The marked test: the grade, then every question marked. -->
+      <div id="mb-marked" class="mb-sheet" hidden>
+        <div class="mb-sheet-head mb-result">
+          <p id="mb-grade" class="mb-grade">A</p>
+          <p id="mb-score" class="mb-score"></p>
+        </div>
+        <ol id="mb-marks" class="mb-list mb-marks"></ol>
+        <div class="hub-launch-actions"><button type="button" class="hub-play" id="mb-next">Next test</button></div>
+      </div>
+      <div id="mb-card" class="done" hidden>
+        <div class="done-card">
+          <h2 id="mb-card-title">Pop Quiz</h2>
+          <p id="mb-card-lines" class="soft mb-card-lines"></p>
+          <button type="button" id="mb-card-go" class="hub-button">Start</button>
+          <button type="button" id="mb-card-home" class="pill done-home">Back</button>
+        </div>
+      </div>
+      <div id="mb-rules" class="rules" hidden>
+        <div class="rules-card">
+          <h2>How to play</h2>
+          <p class="rules-lead">Mental maths: no calculator, no paper. Whole numbers only.</p>
+          <dl>
+            <dt>A test</dt>
+            <dd>100 questions, one at a time. Type the answer on the keypad, then Next. Nothing is marked until you hand it in.</dd>
+            <dt>Back and Review</dt>
+            <dd>Go back or open the review to check and change answers before you hand in. The clock keeps going, so checking costs time.</dd>
+            <dt>Your grade</dt>
+            <dd>A for 90 and up, B for 80, C for 70, D for 60, F below that. A handed-in test stays in the book, marked.</dd>
+            <dt>Pop Quiz</dt>
+            <dd>One minute: answer as many as you can. One try each: a wrong answer stays wrong. Right answers make your score; beat your best.</dd>
+            <dt>The clock</dt>
+            <dd>Counts only while the questions are in front of you. It stops for these rules, Settings, and when you leave.</dd>
+          </dl>
+          <p class="rules-close">Tap anywhere to close</p>
         </div>
       </div>
     </section>

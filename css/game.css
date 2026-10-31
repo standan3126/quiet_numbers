@@ -1069,3 +1069,343 @@ html.ios-solid-bar .screen {
     transition: none;
   }
 }
+
+/* --- Math Bash ------------------------------------------------------------------------------ */
+
+/* The card's "What?" row: five compact choices. */
+.chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.chip-row {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip-row .level-at:empty {
+  display: none;
+}
+
+.chip-row[aria-checked='true'] {
+  border: 2px solid var(--accent);
+  padding: 0 13px;
+  background: var(--panel-solid);
+}
+
+#mathbash-mode {
+  margin-bottom: 4px;
+}
+
+#mathbash-body .levels-list + .difficulty-note {
+  margin-bottom: 14px;
+}
+
+/* A test in the book: a sheet of paper, the grade on it once handed in. */
+.mb-mini {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  margin-bottom: 4px;
+  border: 1.5px solid var(--grid-bold);
+  background: repeating-linear-gradient(var(--paper) 0 13%, var(--grid-thin) 13% 14%);
+  color: var(--pen);
+  font-size: 2.6rem;
+  font-weight: 700;
+}
+
+.mb-mini[hidden] {
+  display: none;
+}
+
+.mb-mini[data-state='graded'] {
+  color: var(--wrong);
+  font-family: 'Comic Sans MS', 'Segoe Print', cursive;
+}
+
+.mb-mini[data-state='started'] {
+  font-size: 1.2rem;
+}
+
+/* The question screen: the question big, the answer under it, the keypad at the bottom. */
+.mb-area {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 114px) 12px calc(env(safe-area-inset-bottom) + 14px);
+  box-sizing: border-box;
+}
+
+.mb-area[hidden],
+.mb-sheet[hidden] {
+  display: none;
+}
+
+.mb-ask {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: min(420px, 100%);
+}
+
+.mb-moves {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mb-moves .pill[hidden] {
+  visibility: hidden;
+  display: block;
+}
+
+.mb-moves .pill:disabled {
+  opacity: 0.35;
+}
+
+.mb-count {
+  margin: 0;
+  color: var(--soft);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mb-question {
+  margin: 0;
+  font-size: clamp(2.2rem, 11vw, 3.2rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--given);
+}
+
+/* The answer, written on a line like paper. */
+.mb-answer {
+  min-width: 4ch;
+  min-height: 1.25em;
+  margin: 0;
+  padding: 0 12px;
+  border-bottom: 2px solid var(--grid-bold);
+  text-align: center;
+  font-size: clamp(2.2rem, 11vw, 3rem);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--pen);
+}
+
+.mb-flash {
+  position: absolute;
+  bottom: 0;
+  margin: 0;
+  min-height: 1.6em;
+  font-size: 1.3rem;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.mb-flash.show {
+  opacity: 1;
+}
+
+.mb-flash.right {
+  color: var(--pen);
+}
+
+.mb-flash.wrong {
+  color: var(--wrong);
+}
+
+/* The keypad: big keys, 1 2 3 on top like a phone. */
+.mb-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: min(420px, 100%);
+}
+
+.mb-key {
+  min-height: 60px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 1.7rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.mb-key:active {
+  background: var(--line);
+}
+
+.mb-key.mb-next {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-size: 1.25rem;
+}
+
+/* The review sheet and the marked test: a long list that scrolls, the button in Play's spot. */
+.mb-sheet {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: calc(env(safe-area-inset-top) + 66px) 16px calc(env(safe-area-inset-bottom) + 120px);
+  box-sizing: border-box;
+}
+
+.mb-sheet-head {
+  width: min(420px, 100%);
+  margin: 0 auto 10px;
+  padding-right: 56px; /* clear of the ? under the gear */
+  box-sizing: border-box;
+}
+
+.mb-sheet-head h2 {
+  margin: 0 0 4px;
+}
+
+.mb-sheet-head p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.mb-list {
+  width: min(420px, 100%);
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.mb-row,
+.mb-marks li {
+  display: grid;
+  grid-template-columns: 2.4em 1fr auto auto auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.mb-marks li {
+  cursor: default;
+}
+
+.mb-row-n {
+  color: var(--soft);
+  font-size: 0.85rem;
+}
+
+.mb-row-q {
+  font-weight: 600;
+  color: var(--given);
+}
+
+.mb-row-a {
+  min-width: 3ch;
+  text-align: right;
+  color: var(--pen);
+  font-weight: 600;
+}
+
+/* A blank answer stands out on the review sheet. */
+.mb-row.blank {
+  background: var(--panel);
+}
+
+.mb-row.blank .mb-row-a {
+  color: var(--wrong);
+}
+
+.mb-mark {
+  width: 1.2em;
+  text-align: center;
+  font-weight: 700;
+}
+
+.mb-marks .right .mb-mark {
+  color: var(--pen);
+}
+
+.mb-marks .wrong .mb-mark,
+.mb-fix {
+  color: var(--wrong);
+  font-weight: 700;
+}
+
+.mb-marks .wrong .mb-row-a {
+  text-decoration: line-through;
+  text-decoration-color: var(--wrong);
+}
+
+.mb-fix:empty {
+  display: none;
+}
+
+/* The grade, written big in red pencil like a teacher's. */
+.mb-result {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.mb-grade {
+  margin: 0;
+  font-size: 4.5rem;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--wrong);
+  font-family: 'Comic Sans MS', 'Segoe Print', cursive;
+}
+
+.mb-score {
+  display: grid;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mb-score span:first-child {
+  font-weight: 700;
+}
+
+.mb-card-lines {
+  display: grid;
+  gap: 4px;
+  max-width: 280px;
+  margin: 0 auto 18px;
+  line-height: 1.4;
+}
+
+#mb-clock-wrap[hidden] {
+  display: none;
+}

@@ -32,7 +32,7 @@ jobs:
         run: |
           mkdir -p ../hub/shared/v1
           curl -fsS https://standan3126.github.io/shared/v1/crossword.js -o ../hub/shared/v1/crossword.js
-          node --test tests/sudoku.test.mjs tests/sumcross.test.mjs
+          node --test tests/sudoku.test.mjs tests/sumcross.test.mjs tests/mathbash.test.mjs
       - name: Gather the site
         run: |
           mkdir _site

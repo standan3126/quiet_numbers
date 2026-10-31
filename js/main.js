@@ -17,6 +17,8 @@ import { Sound } from '/shared/v1/sound/index.js'
 import { DIFFICULTIES, DIFFICULTY_NAMES, PEERS, digitsOf, parse, solve } from './sudoku.js'
 import { answerOf, decodePuzzle, isAnswer } from './sumcross.js'
 import { drawBoard, writeNotes, writeSquare } from './sumcross-board.js'
+import { BOOK_SIZE, CATEGORIES, CATEGORY_NAMES, LEVEL_IDS, LEVEL_NAMES, gradeOf } from './mathbash.js'
+import { createMathBash } from './mathbash-play.js'
 
 const GAME_ID = 'quiet-numbers'
 const store = gameStore(GAME_ID)
@@ -53,6 +55,16 @@ const GAMES = {
       expert: 'Square roots and squares join in.',
     },
   },
+  mathbash: {
+    name: 'Math Bash',
+    rules: 'rules-mathbash',
+    notes: {
+      easy: 'Two-digit adding and taking away, times tables to 12.',
+      medium: 'Three digits and two; two digits times one.',
+      hard: 'Three digits and three; three digits times one.',
+      extreme: 'Four digits; two digits times two. A real workout.',
+    },
+  },
 }
 const KINDS = Object.keys(GAMES)
 // The launch page's parts for a game: Sudoku's kept their first names (difficulty, board-status...).
@@ -67,8 +79,23 @@ const idOf = (kind, part) => (kind === 'sudoku' ? part : `${kind}-${part}`)
 //   A Sudoku board = { values (81: '.' or ink), notes (bit masks), whiteout, checked (square lists),
 //   hints, looked, time, hintAt, done (local day) }. A Sum Cross board is the same with values = a
 //   list (null or the ink, one per square) and notes = a list of numbers per square.
-const NEW_SAVE = () => ({ v: 3, game: 'sudoku', games: { sudoku: { difficulty: 'easy', at: {} }, sumcross: { difficulty: 'easy', at: {} } }, tips: [] })
+//   Math Bash: games.mathbash also has category, mode ('test' | 'quiz') and best (Pop Quiz high
+//   scores by book); its books are book-mathbash-<category>-<level> (tests: see mathbash-play.js).
+const NEW_SAVE = () => ({
+  v: 3,
+  game: 'sudoku',
+  games: { sudoku: { difficulty: 'easy', at: {} }, sumcross: { difficulty: 'easy', at: {} }, mathbash: { difficulty: 'easy', category: 'add', mode: 'test', at: {}, best: {} } },
+  tips: [],
+})
 const bookKey = (kind, d) => (kind === 'sudoku' ? `book-${d}` : `book-${kind}-${d}`)
+// A game's books: one per difficulty; Math Bash one per category and level ("add-easy").
+const bookIds = (kind) => (kind === 'mathbash' ? CATEGORIES.flatMap((c) => LEVEL_IDS.map((d) => `${c}-${d}`)) : DIFFICULTIES)
+// Math Bash's top level is Extreme (user, 2026-10-30); the puzzles' is Expert.
+const levelsOf = (kind) => (kind === 'mathbash' ? LEVEL_IDS : DIFFICULTIES)
+const NAMES = { ...DIFFICULTY_NAMES, ...LEVEL_NAMES }
+// The book a difficulty means for a game right now.
+const bookOf = (kind, level = prefs(kind).difficulty) => (kind === 'mathbash' ? `${prefs(kind).category}-${level}` : level)
+const levelOf = (kind, id) => (kind === 'mathbash' ? id.split('-')[1] : id)
 
 let save
 const books = {}
@@ -79,11 +106,12 @@ function load() {
   if (saved.v === 3) {
     if (saved.game in GAMES) save.game = saved.game
     for (const kind of KINDS) save.games[kind] = { ...save.games[kind], ...saved.games?.[kind], at: { ...saved.games?.[kind]?.at } }
+    save.games.mathbash.best = { ...saved.games?.mathbash?.best }
   }
   if (saved.v >= 2) save.tips = saved.tips ?? []
   for (const kind of KINDS) {
     books[kind] = {}
-    for (const d of DIFFICULTIES) books[kind][d] = store.get(bookKey(kind, d), {})
+    for (const d of bookIds(kind)) books[kind][d] = store.get(bookKey(kind, d), {})
   }
 }
 load()
@@ -100,7 +128,7 @@ function tally(kind, d) {
   const own = done.filter(isOwn)
   return { solved: done.length, own: own.length, best: own.length ? Math.min(...own.map((b) => b.time)) : null }
 }
-const bookSize = (kind, d) => packs[kind][d].length
+const bookSize = (kind, d) => (kind === 'mathbash' ? BOOK_SIZE : packs[kind][d].length)
 // The first unsolved puzzle after n (then from the start); null when the book is finished.
 function nextOpen(kind, d, n = 0) {
   const size = bookSize(kind, d)
@@ -119,11 +147,15 @@ setupPage()
 // gear shows the rules while playing.
 const frame = gameFrame({
   onSettings: () => panel.open(),
-  onHelp: () => showRules(),
-  beforeExit: () => saveBoard(),
+  onHelp: () => (mathBash.active() ? mathBash.help() : showRules()),
+  beforeExit: () => {
+    saveBoard()
+    mathBash.leave()
+  },
   onHome: () => {
     saveBoard()
-    if (current) openBook(current.kind, current.difficulty, current.n)
+    if (mathBash.active()) mathBash.home()
+    else if (current) openBook(current.kind, current.difficulty, current.n)
     else showHome()
   },
 })
@@ -199,14 +231,15 @@ function sumCrossFor(d, n) {
 // the information was difficult because its all the same font, same size, same color"): the about
 // text is plain and soft, how far you are is bold, a waiting board is a coloured line.
 const difficultyRows = {}
+const choiceRows = {} // Math Bash's category and mode choices
 let openCard = save.game
 for (const kind of KINDS) {
-  difficultyRows[kind] = DIFFICULTIES.map((d) => {
+  difficultyRows[kind] = levelsOf(kind).map((d) => {
     const b = Object.assign(document.createElement('button'), { type: 'button', className: 'level-row' })
     b.dataset.value = d
     b.setAttribute('role', 'radio')
-    b.innerHTML = '<span class="level-name"></span><span class="level-at"><b></b> of <span class="level-size"></span> solved</span>'
-    b.querySelector('.level-name').textContent = DIFFICULTY_NAMES[d]
+    b.innerHTML = `<span class="level-name"></span><span class="level-at"><b></b> of <span class="level-size"></span> ${kind === 'mathbash' ? 'done' : 'solved'}</span>`
+    b.querySelector('.level-name').textContent = NAMES[d]
     b.addEventListener('click', () => {
       prefs(kind).difficulty = d
       save.game = kind
@@ -216,6 +249,7 @@ for (const kind of KINDS) {
     return b
   })
   $(idOf(kind, 'difficulty')).append(...difficultyRows[kind])
+  if (kind === 'mathbash') buildMathBashChoices()
   $(`open-${kind}`).addEventListener('click', () => {
     openCard = openCard === kind ? null : kind
     if (openCard) save.game = kind
@@ -224,8 +258,33 @@ for (const kind of KINDS) {
   })
 }
 
+// Math Bash's card also asks what (the category) and Test or Pop Quiz.
+function buildMathBashChoices() {
+  const row = (key, values, label, sub) =>
+    values.map((v) => {
+      const b = Object.assign(document.createElement('button'), { type: 'button', className: key === 'category' ? 'chip-row' : 'level-row' })
+      b.dataset.value = v
+      b.setAttribute('role', 'radio')
+      b.innerHTML = '<span class="level-name"></span><span class="level-at"></span>'
+      b.querySelector('.level-name').textContent = label(v)
+      if (sub) b.querySelector('.level-at').textContent = sub(v)
+      b.addEventListener('click', () => {
+        prefs('mathbash')[key] = v
+        save.game = 'mathbash'
+        saveGame()
+        showHome()
+      })
+      return b
+    })
+  choiceRows.category = row('category', CATEGORIES, (c) => CATEGORY_NAMES[c])
+  choiceRows.mode = row('mode', ['test', 'quiz'], (m) => (m === 'test' ? 'Test' : 'Pop Quiz'), (m) => (m === 'test' ? '100 questions, graded' : 'One minute'))
+  $('mathbash-category').append(...choiceRows.category)
+  $('mathbash-mode').append(...choiceRows.mode)
+}
+
 function hideScreens() {
   stopClock()
+  mathBash?.leave()
   current = null
   for (const id of ['home', 'book-screen', 'play-screen', 'done']) $(id).hidden = true
 }
@@ -239,22 +298,40 @@ function showHome() {
   for (const kind of KINDS) {
     $(`open-${kind}`).setAttribute('aria-expanded', String(openCard === kind))
     $(`${kind}-body`).hidden = openCard !== kind
-    const d = prefs(kind).difficulty
-    $(idOf(kind, 'difficulty-note')).textContent = GAMES[kind].notes[d]
+    const level = prefs(kind).difficulty
+    const d = bookOf(kind)
+    $(idOf(kind, 'difficulty-note')).textContent = GAMES[kind].notes[level]
     if (!packs) continue
     for (const row of difficultyRows[kind]) {
       const r = row.dataset.value
-      row.setAttribute('aria-checked', String(r === d))
-      row.querySelector('b').textContent = tally(kind, r).solved
-      row.querySelector('.level-size').textContent = bookSize(kind, r)
+      row.setAttribute('aria-checked', String(r === level))
+      row.querySelector('b').textContent = tally(kind, bookOf(kind, r)).solved
+      row.querySelector('.level-size').textContent = bookSize(kind, bookOf(kind, r))
     }
+    if (kind === 'mathbash' && mathBashStatus()) continue
     const at = prefs(kind).at[d]
     const waiting = at && books[kind][d][at] && !books[kind][d][at].done
     const next = nextOpen(kind, d)
     const status = $(idOf(kind, 'board-status'))
-    status.textContent = waiting ? `Puzzle ${at} is waiting where you left it.` : next ? `Next: puzzle ${next}.` : `You finished the ${DIFFICULTY_NAMES[d]} book.`
+    const word = kind === 'mathbash' ? 'test' : 'puzzle'
+    status.textContent = waiting ? `${word[0].toUpperCase() + word.slice(1)} ${at} is waiting where you left it.` : next ? `Next: ${word} ${next}.` : `You finished the ${NAMES[level]} book.`
     status.classList.toggle('waiting', !!waiting)
   }
+  $('play').textContent = save.game === 'mathbash' && prefs('mathbash').mode === 'quiz' ? 'Play Pop Quiz' : `Play ${GAMES[save.game].name}`
+}
+
+// Math Bash's picked category and mode; in Pop Quiz mode the status is the high score. True when
+// it wrote the status.
+function mathBashStatus() {
+  const p = prefs('mathbash')
+  for (const key of ['category', 'mode']) for (const b of choiceRows[key]) b.setAttribute('aria-checked', String(b.dataset.value === p[key]))
+  for (const b of choiceRows.mode) if (b.dataset.value === 'quiz') b.querySelector('.level-at').textContent = p.best[bookOf('mathbash')] ? `Best: ${p.best[bookOf('mathbash')]}` : 'One minute'
+  if (p.mode !== 'quiz') return false
+  const best = p.best[bookOf('mathbash')]
+  const status = $('mathbash-board-status')
+  status.textContent = best ? `Pop Quiz best: ${best} right.` : 'No Pop Quiz score yet.'
+  status.classList.remove('waiting')
+  return true
 }
 
 // "On your own", "2 hints", "Looked", "1 hint, looked".
@@ -266,7 +343,12 @@ function howSolved({ hints, looked }) {
 
 $('play').addEventListener('click', async () => {
   await packsReady
-  openBook(save.game, prefs(save.game).difficulty)
+  const p = prefs(save.game)
+  if (save.game === 'mathbash' && p.mode === 'quiz') {
+    hideScreens()
+    return mathBash.startQuiz(p.category, p.difficulty)
+  }
+  openBook(save.game, bookOf(save.game))
 })
 
 // --- The book ----------------------------------------------------------------------------------
@@ -280,7 +362,7 @@ const book = new Book({
   perPage: 6,
   count: () => bookSize(shelf.kind, shelf.d),
   buildTile: (tile) => {
-    tile.innerHTML = '<span class="mini"></span><span class="sc-mini"></span><span class="tile-n"></span><span class="tile-state"></span><span class="tile-how"></span>'
+    tile.innerHTML = '<span class="mini"></span><span class="sc-mini"></span><span class="mb-mini"></span><span class="tile-n"></span><span class="tile-state"></span><span class="tile-how"></span>'
     tile.querySelector('.mini').append(...Array.from({ length: 81 }, () => document.createElement('span')))
   },
   drawTile: (tile, n) => {
@@ -288,10 +370,12 @@ const book = new Book({
     const b = books[kind][d][n]
     tile.querySelector('.mini').hidden = kind !== 'sudoku'
     tile.querySelector('.sc-mini').hidden = kind !== 'sumcross'
-    if (kind === 'sudoku') drawSudokuTile(tile.querySelector('.mini'), sudokuFor(d, n), b)
-    else drawSumCrossTile(tile.querySelector('.sc-mini'), sumCrossFor(d, n), b)
+    tile.querySelector('.mb-mini').hidden = kind !== 'mathbash'
     tile.querySelector('.tile-n').textContent = n
     tile.classList.toggle('solved', !!b?.done)
+    if (kind === 'mathbash') return drawMathBashTile(tile, b)
+    if (kind === 'sudoku') drawSudokuTile(tile.querySelector('.mini'), sudokuFor(d, n), b)
+    else drawSumCrossTile(tile.querySelector('.sc-mini'), sumCrossFor(d, n), b)
     tile.querySelector('.tile-state').textContent = b?.done ? clockText(b.time) : b ? `In progress · ${clockText(b.time)}` : 'Fresh'
     const how = tile.querySelector('.tile-how')
     how.textContent = b?.done ? howSolved(b) : ''
@@ -299,9 +383,15 @@ const book = new Book({
   },
   startLabel: (n) => {
     const b = books[shelf.kind][shelf.d][n]
-    return b?.done ? `Look at puzzle ${n}` : b ? `Continue puzzle ${n}` : `Start puzzle ${n}`
+    const word = shelf.kind === 'mathbash' ? 'test' : 'puzzle'
+    return b?.done ? `Look at ${word} ${n}` : b ? `Continue ${word} ${n}` : `Start ${word} ${n}`
   },
-  onStart: (n) => start(shelf.kind, shelf.d, n),
+  onStart: (n) => {
+    if (shelf.kind !== 'mathbash') return start(shelf.kind, shelf.d, n)
+    const [category, level] = shelf.d.split('-')
+    hideScreens()
+    mathBash.startTest(category, level, n)
+  },
 })
 book.start.id = 'start'
 book.label.id = 'page-at'
@@ -316,6 +406,15 @@ function drawSudokuTile(mini, given, b) {
     // White-out shows under new ink too, as on paper.
     sq.className = given[i] ? 'g' : [ink[i] && 'i', white.has(i) && 'w'].filter(Boolean).join(' ')
   })
+}
+
+// Math Bash's small picture: a sheet of paper with the grade on it once handed in.
+function drawMathBashTile(tile, b) {
+  const mini = tile.querySelector('.mb-mini')
+  mini.textContent = b?.done ? gradeOf(b.right) : b ? `${b.answers.filter(Boolean).length}` : ''
+  mini.dataset.state = b?.done ? 'graded' : b ? 'started' : 'fresh'
+  tile.querySelector('.tile-state').textContent = b?.done ? `${b.right}% · ${clockText(b.time)}` : b ? `${b.answers.filter(Boolean).length} answered · ${clockText(b.time)}` : 'Fresh'
+  tile.querySelector('.tile-how').textContent = ''
 }
 
 // Sum Cross's small picture: the puzzle's shape, printed numbers dark, ink in pen colour.
@@ -335,7 +434,8 @@ function drawSumCrossTile(mini, p, b) {
 
 function openBook(kind, d, n = prefs(kind).at[d] ?? nextOpen(kind, d) ?? 1) {
   save.game = kind
-  prefs(kind).difficulty = d
+  prefs(kind).difficulty = levelOf(kind, d)
+  if (kind === 'mathbash') prefs(kind).category = d.split('-')[0]
   saveGame()
   openCard = kind
   hideScreens()
@@ -343,10 +443,29 @@ function openBook(kind, d, n = prefs(kind).at[d] ?? nextOpen(kind, d) ?? 1) {
   $('book-screen').hidden = false
   frame.setPage('play') // Home goes back to the launch page
   frame.help.hidden = true // the rules are for the board
-  $('book-name').textContent = `${GAMES[kind].name} · ${DIFFICULTY_NAMES[d]}`
+  $('book-name').textContent = kind === 'mathbash' ? `${CATEGORY_NAMES[d.split('-')[0]]} · ${NAMES[levelOf(kind, d)]}` : `${GAMES[kind].name} · ${DIFFICULTY_NAMES[d]}`
   applyTheme()
   book.open(n)
 }
+
+// Math Bash's screens (mathbash-play.js): tests from these books, and Pop Quiz.
+const mathBash = createMathBash({
+  $,
+  sound,
+  panel,
+  frame,
+  book: (id) => books.mathbash[id],
+  prefs: () => prefs('mathbash'),
+  tips: () => save.tips,
+  saveGame,
+  saveBook: (id) => saveBook('mathbash', id),
+  nextOpen: (id, n) => nextOpen('mathbash', id, n),
+  openBook: (id, n) => openBook('mathbash', id, n),
+  showHome: () => showHome(),
+  clockText: (s) => clockText(s),
+  levelName: (l) => NAMES[l],
+  today,
+})
 
 // --- The board ---------------------------------------------------------------------------------
 
@@ -1042,6 +1161,7 @@ window.quietNumbers = {
   packsReady,
   books,
   scView,
+  mathBash,
   get current() {
     return current
   },
