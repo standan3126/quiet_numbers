@@ -788,8 +788,8 @@ html.ios-solid-bar .screen {
   touch-action: none; /* so a drag moves the number instead of the page */
 }
 
-/* The number being dragged, a square's size, centred where it will land: floating above a
-   finger, or right at a stylus tip (see dropPoint in main.js). The ringed square is where it goes. */
+/* The number being dragged, a square's size, centred where it will land: floating above the
+   finger or stylus (see dropPoint in main.js). The ringed square is where it goes. */
 .ghost {
   position: fixed;
   z-index: 5;
@@ -805,11 +805,6 @@ html.ios-solid-bar .screen {
   transform: translate(-50%, -50%);
   pointer-events: none;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
-}
-
-/* At a stylus tip the number covers its square, so it's see-through. */
-html[data-input='stylus'] .ghost {
-  opacity: 0.6;
 }
 
 .ghost[hidden] {

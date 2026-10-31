@@ -1,10 +1,9 @@
 // Plays Quiet Numbers in phone-sized browsers: npm test (starts its own server on 4230).
 import { expect, test } from '@playwright/test'
 
-// The start card asks Finger or Stylus every time.
-const start = async (page, how = 'Finger') => {
+const start = async (page) => {
   await page.goto('./')
-  await page.locator('.hub-start button', { hasText: how }).click()
+  await page.locator('.hub-start button', { hasText: 'Tap to Start' }).click()
   await expect(page.locator('#home')).toBeVisible()
 }
 
@@ -266,14 +265,14 @@ test('Look asks once, shows the answer key, any tap puts it away; then it opens 
   await expect(page.locator('.hub-book-tile').first().locator('.tile-how')).not.toHaveClass(/own/)
 })
 
-for (const how of ['Finger', 'Stylus'])
-  test(`dragging with a ${how.toLowerCase()}: the number lands where it is drawn`, async ({ page }) => {
-    await start(page, how)
+test('dragging: the number floats above the finger and lands where it is drawn', async ({ page }) => {
+    await expect(page.locator('.hub-start button', { hasText: 'Stylus' })).toHaveCount(0) // no question any more
+    await start(page)
     await play(page)
     const a = await emptyCell(page, 20) // lower down the grid, so the finger can be below it
     const from = await number(page, a.d).boundingBox()
     const to = await cell(page, a.i).boundingBox()
-    const lift = how === 'Finger' ? 72 : 0
+    const lift = 72
     await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
     await page.mouse.down()
     await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2 + lift, { steps: 8 })
@@ -310,7 +309,7 @@ test('a half-done puzzle, its time and the difficulty are kept after closing the
   await page.locator('.hub-corner', { hasText: 'Home' }).click()
   await expect(page.locator('#board-status')).toContainText('Puzzle 1 is waiting')
   await page.reload()
-  await page.locator('.hub-start button', { hasText: 'Finger' }).click()
+  await page.locator('.hub-start button', { hasText: 'Tap to Start' }).click()
   await expect(page.locator('#sudoku-body .level-row[aria-checked="true"] .level-name')).toHaveText('Hard')
   await play(page)
   expect((await state(page)).values[a.i]).toBe(a.d)

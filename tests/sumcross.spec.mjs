@@ -1,10 +1,10 @@
 // Plays Sum Cross in phone-sized browsers (npm test runs it with the Sudoku tests).
 import { expect, test } from '@playwright/test'
 
-// The start card asks Finger or Stylus; then the Sum Cross card, a difficulty, Play, Start.
+// Tap to Start; then the Sum Cross card, a difficulty, Play, Start.
 const openSumCross = async (page, difficulty = 'Easy') => {
   await page.goto('./')
-  await page.locator('.hub-start button', { hasText: 'Finger' }).click()
+  await page.locator('.hub-start button', { hasText: 'Tap to Start' }).click()
   await page.locator('#open-sumcross').click()
   await expect(page.locator('#sumcross-body')).toBeVisible()
   await expect(page.locator('#sudoku-body')).toBeHidden() // one card open at a time
@@ -53,7 +53,7 @@ test('Sum Cross: its card and book, and Easy 1 solved on your own by dragging fr
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
   await page.goto('./')
-  await page.locator('.hub-start button', { hasText: 'Finger' }).click()
+  await page.locator('.hub-start button', { hasText: 'Tap to Start' }).click()
   await page.locator('#open-sumcross').click()
   await expect(page.locator('#sumcross-board-status')).toHaveText('Next: puzzle 1.')
   await expect(page.locator('#sumcross-body .level-row', { hasText: 'Easy' }).locator('.level-size')).toHaveText('600')
@@ -194,7 +194,7 @@ test('Sum Cross: kept after closing the app; pinch-zoom (wheel here) and taps st
   await page.locator('.hub-corner', { hasText: 'Home' }).click()
   await expect(page.locator('.hub-book-tile').first().locator('.tile-state')).toHaveText('In progress · 1:15')
   await page.reload()
-  await page.locator('.hub-start button', { hasText: 'Finger' }).click()
+  await page.locator('.hub-start button', { hasText: 'Tap to Start' }).click()
   await expect(page.locator('#sumcross-body')).toBeVisible() // the card played last is open
   await expect(page.locator('#sumcross-board-status')).toContainText('Puzzle 1 is waiting')
   await page.locator('#play').click()

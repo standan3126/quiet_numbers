@@ -24,8 +24,9 @@ const store = gameStore(GAME_ID)
 // Hint circles wrong ink. One whenever you like, then the next is ready 2 minutes (of play) later
 // (user, 2026-10-30: "so you cant just keep using it").
 const HINT_WAIT = 120
-// Finger dragging: the number floats this far above the fingertip, and lands where the number
-// is, not where the finger is (user, 2026-10-30: "otherwise you are placing the number blind").
+// Dragging: the number floats this far above the fingertip (or stylus tip), and lands where the
+// number is, not under the finger (user, 2026-10-30: "otherwise you are placing the number blind").
+// The same for a stylus: the user tried both and liked the floating number best.
 const FINGER_LIFT = 72
 // A Sum Cross box on the board before zooming, in CSS pixels (the board is scaled to fit).
 const UNIT = 48
@@ -364,7 +365,6 @@ function openBook(kind, d, n = prefs(kind).at[d] ?? nextOpen(kind, d) ?? 1) {
 let current = null
 let pick = null // the number picked on the number row or in the bank
 let sel = null // the square tapped last
-let input = 'finger' // 'finger' | 'stylus', asked on the start card every time the game opens
 
 const isSC = () => current?.kind === 'sumcross'
 const inked = (i) => (isSC() ? current.values[i] !== null : current.values[i] !== 0)
@@ -486,8 +486,8 @@ function squareAt({ x, y }) {
   if (isSC()) return Number(el?.closest('#sc-board .sc-sq')?.dataset.i ?? -1)
   return cells.indexOf(el?.closest('.cell'))
 }
-// Where the dragged number is: above a finger (so it can be seen), right at a stylus tip.
-const dropPoint = (e) => ({ x: e.clientX, y: e.clientY - (input === 'finger' ? FINGER_LIFT : 0) })
+// Where the dragged number is: above the finger or stylus, so it can be seen.
+const dropPoint = (e) => ({ x: e.clientX, y: e.clientY - FINGER_LIFT })
 function endDrag() {
   if (drag) dropTargets()[drag.over]?.classList.remove('drop')
   drag = null
@@ -1037,9 +1037,6 @@ packsReady.then(() => $('home').hidden || showHome())
 // For the tests (and curious grown-ups in the browser console).
 window.quietNumbers = {
   panel,
-  get input() {
-    return input
-  },
   start,
   openBook,
   packsReady,
@@ -1053,18 +1050,9 @@ window.quietNumbers = {
   },
 }
 
-// Finger or stylus, asked every time (user, 2026-10-30): it only changes how dragging works.
 tapToStart({
   title: 'Quiet Numbers',
-  subtitle: 'How are you playing today?',
-  choices: [
-    { value: 'finger', label: 'Finger', hint: 'Numbers float above your finger' },
-    { value: 'stylus', label: 'Stylus', hint: 'Numbers sit at the tip' },
-  ],
-  onStart: (how) => {
-    input = how
-    document.documentElement.dataset.input = how
-    sound.unlock()
-  },
+  subtitle: 'Number puzzles on clean paper.',
+  onStart: () => sound.unlock(),
 })
 warmOffline('offline-files.json')
